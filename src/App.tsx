@@ -236,7 +236,7 @@ function App() {
               Whiteout Survival · State 2086
             </p>
             <h1 className="mt-1 font-display text-lg font-semibold text-zinc-100">
-              Rally time coordinator (for Kitty)
+              Rally time coordinator
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-zinc-500">
               Run the stage clock, read the caller script for the selected group, and
