@@ -1,0 +1,39 @@
+export type RallyGroup = {
+  id: string
+  label: string
+  /**
+   * Seconds between consecutive members’ target fort arrivals in list order.
+   * With march durations Dᵢ, member index i aims for arrival at T₀ + i×gap
+   * (T₀ chosen so rally departures are non‑negative). 0 = same target instant for all.
+   */
+  targetArrivalGapSeconds: number
+}
+
+export type RallyLeadEntry = {
+  id: string
+  name: string
+  /** Seconds from rally go to fort arrival (roster “March time”, mm:ss). */
+  marchTimeSeconds: number
+  /** Optional extra march seconds; added to {@link marchTimeSeconds} for scheduling. */
+  travelTimeSeconds: number
+  /** When null, the lead is in the source list; otherwise the id of the rally group. */
+  groupId: string | null
+}
+
+export function createEmptyLead(): RallyLeadEntry {
+  return {
+    id: crypto.randomUUID(),
+    name: '',
+    marchTimeSeconds: 0,
+    travelTimeSeconds: 0,
+    groupId: null,
+  }
+}
+
+export function createGroup(label: string): RallyGroup {
+  return {
+    id: crypto.randomUUID(),
+    label,
+    targetArrivalGapSeconds: 0,
+  }
+}
