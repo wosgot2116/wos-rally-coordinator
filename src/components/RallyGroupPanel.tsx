@@ -20,7 +20,7 @@ function MemberReorderDragHandle({
   if (disabled) {
     return (
       <div
-        title="Pause or reset the stage clock to reorder"
+        title="Reset the stage clock to reorder"
         className="inline-flex cursor-not-allowed touch-none select-none rounded px-1 py-2 text-zinc-600 opacity-50"
         aria-hidden
       >
@@ -80,7 +80,7 @@ function MemberReorderDragHandle({
 type RallyGroupPanelProps = {
   groups: RallyGroup[]
   selectedGroupId: string
-  /** When true, group tabs, rename, add group, gap input, drops, reorder, and remove are disabled. */
+  /** When true, group controls are disabled until the stage clock is reset. */
   stageClockRunning: boolean
   onSelectGroup: (groupId: string) => void
   onAddGroup: () => void
@@ -181,9 +181,9 @@ export function RallyGroupPanel({
           Rally groups
         </h2>
         <p className="mt-0.5 text-sm text-zinc-500">
-          Pick a tab, drag unassigned leads from the roster into the drop area,
+          Pick a tab, drag leads from the roster into the drop area,
           then use the dot grip to reorder members. Rename with the pencil or
-          double-click a tab. Group controls lock while the stage clock is running.
+          double-click a tab. Group controls lock while the stage clock is active.
         </p>
       </div>
 
@@ -243,7 +243,7 @@ export function RallyGroupPanel({
                 }}
                 title={
                   panelLocked
-                    ? 'Pause or reset the stage clock to change group'
+                    ? 'Reset the stage clock to change group'
                     : 'Double-click to rename'
                 }
                 className={`px-3 py-1.5 transition focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -264,7 +264,7 @@ export function RallyGroupPanel({
                 aria-label={`Rename ${g.label}`}
                 title={
                   panelLocked
-                    ? 'Pause or reset the stage clock to rename'
+                    ? 'Reset the stage clock to rename'
                     : 'Rename group'
                 }
                 className={`border-l px-2 transition focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -296,7 +296,7 @@ export function RallyGroupPanel({
           onClick={onAddGroup}
           title={
             panelLocked
-              ? 'Pause or reset the stage clock to add a group'
+              ? 'Reset the stage clock to add a group'
               : undefined
           }
           className="rounded-lg border border-dashed border-zinc-600 px-3 py-1.5 text-sm font-medium text-zinc-400 transition hover:border-zinc-500 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
@@ -334,7 +334,7 @@ export function RallyGroupPanel({
                 disabled={panelLocked}
                 title={
                   panelLocked
-                    ? 'Pause or reset the stage clock to edit'
+                    ? 'Reset the stage clock to edit'
                     : undefined
                 }
                 onBlur={(e) => {
@@ -398,8 +398,8 @@ export function RallyGroupPanel({
           <p className="text-center text-sm text-zinc-500">
             {panelLocked ? (
               <>
-                Drop zone locked while the stage clock is running. Pause or reset to
-                assign leads.
+                Drop zone locked while the stage clock is active. Reset to assign
+                leads.
               </>
             ) : (
               <>
@@ -493,7 +493,7 @@ export function RallyGroupPanel({
                         onClick={() => onReturnToSource(m.id)}
                         title={
                           panelLocked
-                            ? 'Pause or reset the stage clock to remove from group'
+                            ? 'Reset the stage clock to remove from group'
                             : undefined
                         }
                         className="rounded-md border border-zinc-700 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"

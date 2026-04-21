@@ -13,7 +13,7 @@ function AssignToGroupDragHandle({ leadId }: { leadId: string }) {
         e.dataTransfer.effectAllowed = 'move'
       }}
       title="Drag into the group drop zone"
-      className="inline-flex cursor-grab touch-none select-none rounded px-2 py-2 text-amber-500/90 hover:bg-zinc-800 hover:text-amber-400 active:cursor-grabbing"
+      className="hidden cursor-grab touch-none select-none rounded px-2 py-2 text-amber-500/90 hover:bg-zinc-800 hover:text-amber-400 active:cursor-grabbing sm:inline-flex"
       role="button"
       tabIndex={0}
       aria-label="Drag lead into the selected rally group"
@@ -34,16 +34,19 @@ function AssignToGroupDragHandle({ leadId }: { leadId: string }) {
 
 export type { RallyLeadEntry } from '../rally/rallyTypes'
 
-function groupLabel(groups: RallyGroup[], groupId: string | null): string {
-  if (groupId === null) return ''
-  return groups.find((g) => g.id === groupId)?.label ?? 'Unknown group'
+function groupLabels(groups: RallyGroup[], groupIds: string[]): string[] {
+  if (groupIds.length === 0) return []
+  return groupIds.map((groupId) => {
+    return groups.find((g) => g.id === groupId)?.label ?? 'Unknown group'
+  })
 }
 
 export type RallyLeadListProps = {
   rows: RallyLeadEntry[]
   groups: RallyGroup[]
-  /** When true, roster edits and add/remove are disabled (stage clock is running). */
+  /** When true, roster controls are disabled until the stage clock is reset. */
   stageClockRunning: boolean
+  onAssignLead: (leadId: string, groupId: string) => void
   onUpdateLead: (
     id: string,
     patch: Partial<Pick<RallyLeadEntry, 'name' | 'marchTimeSeconds'>>,
@@ -56,6 +59,7 @@ export function RallyLeadList({
   rows,
   groups,
   stageClockRunning,
+  onAssignLead,
   onUpdateLead,
   onRemoveLead,
   onAddLead,
@@ -80,9 +84,9 @@ export function RallyLeadList({
             Roster
           </h2>
           <p className="mt-0.5 text-sm text-zinc-500">
-            Edit names and march times for any row. Drag unassigned leads into a
-            group. Player, march time, Add lead, and Remove are locked while the
-            stage clock is running.
+            Edit names and march times for any row. Drag leads into a group on
+            desktop, or use the Add-to-group dropdown on mobile. Player, march
+            time, Add lead, and Remove are locked while the stage clock is active.
           </p>
         </div>
         <button
@@ -91,7 +95,7 @@ export function RallyLeadList({
           onClick={onAddLead}
           title={
             rosterLocked
-              ? 'Pause or reset the stage clock to add leads'
+              ? 'Reset the stage clock to add leads'
               : undefined
           }
           className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-amber-500"
@@ -134,8 +138,8 @@ export function RallyLeadList({
               </tr>
             ) : (
               rows.map((row) => {
-                const assigned = row.groupId !== null
-                const label = groupLabel(groups, row.groupId)
+                const labels = groupLabels(groups, row.groupIds)
+                const assigned = labels.length > 0
                 const fieldClass =
                   'rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900/80 disabled:text-zinc-500 disabled:opacity-80'
 
@@ -160,16 +164,16 @@ export function RallyLeadList({
                         disabled={rosterLocked}
                         title={
                           rosterLocked
-                            ? 'Pause or reset the stage clock to edit'
+                            ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-full min-w-[10rem] ${fieldClass}`}
+                        className={`w-full min-w-[8rem] ${fieldClass}`}
                       />
                     </td>
                     <td className="px-4 py-2 sm:px-5">
                       {assigned ? (
                         <span className="inline-flex max-w-full items-center rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200/95">
-                          <span className="truncate">{label}</span>
+                          <span className="truncate">{labels.join(', ')}</span>
                         </span>
                       ) : (
                         <span className="text-zinc-600">—</span>
@@ -207,23 +211,43 @@ export function RallyLeadList({
                         disabled={rosterLocked}
                         title={
                           rosterLocked
-                            ? 'Pause or reset the stage clock to edit'
+                            ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-28 font-mono tabular-nums ${fieldClass}`}
+                        className={`w-22 font-mono tabular-nums ${fieldClass}`}
                       />
                     </td>
                     <td className="w-px px-2 py-2 align-middle sm:px-3">
-                      {assigned ? (
-                        <span
-                          className="inline-flex px-2 py-2 text-xs font-medium text-zinc-600"
-                          title="Already in a group; use Remove in the group panel to return them to the roster"
-                        >
-                          —
-                        </span>
-                      ) : (
-                        <AssignToGroupDragHandle leadId={row.id} />
-                      )}
+                      <label className="sr-only" htmlFor={`assign-group-${row.id}`}>
+                        Assign to group
+                      </label>
+                      <select
+                        id={`assign-group-${row.id}`}
+                        disabled={rosterLocked}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const groupId = e.target.value
+                          if (!groupId) return
+                          onAssignLead(row.id, groupId)
+                          e.currentTarget.value = ''
+                        }}
+                        className="w-24 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-60 sm:hidden"
+                        title={
+                          rosterLocked
+                            ? 'Reset the stage clock to assign'
+                            : undefined
+                        }
+                      >
+                        <option value="">Add to…</option>
+                        {groups
+                          .filter((g) => !row.groupIds.includes(g.id))
+                          .map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.label}
+                            </option>
+                          ))}
+                      </select>
+                      <AssignToGroupDragHandle leadId={row.id} />
                     </td>
                     <td className="px-4 py-2 sm:px-5">
                       <button
@@ -239,7 +263,7 @@ export function RallyLeadList({
                         }}
                         title={
                           rosterLocked
-                            ? 'Pause or reset the stage clock to remove leads'
+                            ? 'Reset the stage clock to remove leads'
                             : undefined
                         }
                         className="rounded-md border border-zinc-700 px-2.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-red-900/80 hover:bg-red-950/40 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-zinc-700 disabled:hover:bg-transparent disabled:hover:text-zinc-300"

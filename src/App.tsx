@@ -50,7 +50,7 @@ function App() {
   const selectedGroup = groups.find((g) => g.id === activeGroupId)
 
   const groupMembers = useMemo(
-    () => leads.filter((l) => l.groupId === activeGroupId),
+    () => leads.filter((l) => l.groupIds.includes(activeGroupId)),
     [leads, activeGroupId],
   )
 
@@ -67,7 +67,7 @@ function App() {
     (groupId: string, from: number, to: number) => {
       if (!groupId) return
       setLeads((prev) =>
-        moveWithinSubset(prev, (l) => l.groupId === groupId, from, to),
+        moveWithinSubset(prev, (l) => l.groupIds.includes(groupId), from, to),
       )
     },
     [],
@@ -93,14 +93,20 @@ function App() {
   const handleAssignLead = useCallback((leadId: string, groupId: string) => {
     setLeads((prev) =>
       prev.map((r) =>
-        r.id === leadId && r.groupId === null ? { ...r, groupId } : r,
+        r.id === leadId && !r.groupIds.includes(groupId)
+          ? { ...r, groupIds: [...r.groupIds, groupId] }
+          : r,
       ),
     )
   }, [])
 
-  const handleReturnToSource = useCallback((leadId: string) => {
+  const handleReturnToSource = useCallback((leadId: string, groupId: string) => {
     setLeads((prev) =>
-      prev.map((r) => (r.id === leadId ? { ...r, groupId: null } : r)),
+      prev.map((r) =>
+        r.id === leadId
+          ? { ...r, groupIds: r.groupIds.filter((id) => id !== groupId) }
+          : r,
+      ),
     )
   }, [])
 
@@ -291,7 +297,8 @@ function App() {
             <RallyLeadList
               rows={leads}
               groups={groups}
-              stageClockRunning={runState === 'running'}
+              stageClockRunning={runState !== 'idle'}
+              onAssignLead={handleAssignLead}
               onUpdateLead={handleUpdateLead}
               onRemoveLead={handleRemoveLead}
               onAddLead={handleAddLead}
@@ -301,14 +308,16 @@ function App() {
             <RallyGroupPanel
               groups={groups}
               selectedGroupId={activeGroupId}
-              stageClockRunning={runState === 'running'}
+              stageClockRunning={runState !== 'idle'}
               onSelectGroup={setSelectedGroupId}
               onAddGroup={handleAddGroup}
               onRenameGroup={handleRenameGroup}
               onSetGroupTargetArrivalGap={handleSetGroupTargetArrivalGap}
               members={groupMembers}
               onAssignLead={handleAssignLead}
-              onReturnToSource={handleReturnToSource}
+              onReturnToSource={(leadId) =>
+                handleReturnToSource(leadId, activeGroupId)
+              }
               onReorderMembers={(from, to) =>
                 handleReorderGroupMembers(activeGroupId, from, to)
               }

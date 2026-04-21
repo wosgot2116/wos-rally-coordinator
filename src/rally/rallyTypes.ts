@@ -16,8 +16,8 @@ export type RallyLeadEntry = {
   marchTimeSeconds: number
   /** Optional extra march seconds; added to {@link marchTimeSeconds} for scheduling. */
   travelTimeSeconds: number
-  /** When null, the lead is in the source list; otherwise the id of the rally group. */
-  groupId: string | null
+  /** Group ids this lead is assigned to. Empty means unassigned. */
+  groupIds: string[]
 }
 
 export function createEmptyLead(): RallyLeadEntry {
@@ -26,7 +26,7 @@ export function createEmptyLead(): RallyLeadEntry {
     name: '',
     marchTimeSeconds: 0,
     travelTimeSeconds: 0,
-    groupId: null,
+    groupIds: [],
   }
 }
 

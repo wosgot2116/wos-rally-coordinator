@@ -38,15 +38,20 @@ function normalizeLead(raw: Record<string, unknown>): RallyLeadEntry | null {
         : 0
   const travel =
     typeof raw.travelTimeSeconds === 'number' ? raw.travelTimeSeconds : 0
-  const groupId =
-    raw.groupId === null || typeof raw.groupId === 'string' ? raw.groupId : null
+  const groupIds = Array.isArray(raw.groupIds)
+    ? raw.groupIds.filter((id): id is string => typeof id === 'string')
+    : raw.groupId === null
+      ? []
+      : typeof raw.groupId === 'string'
+        ? [raw.groupId]
+        : []
   const name = typeof raw.name === 'string' ? raw.name : ''
   return {
     id: raw.id,
     name,
     marchTimeSeconds: Math.max(0, Math.floor(Number.isFinite(march) ? march : 0)),
     travelTimeSeconds: Math.max(0, Math.floor(Number.isFinite(travel) ? travel : 0)),
-    groupId,
+    groupIds: [...new Set(groupIds)],
   }
 }
 
@@ -64,9 +69,10 @@ function parsePayload(data: unknown): PersistedConfig | null {
     .filter((r): r is RallyLeadEntry => r !== null)
 
   const groupIds = new Set(groups.map((g) => g.id))
-  const leadsSanitized = leads.map((r) =>
-    r.groupId !== null && !groupIds.has(r.groupId) ? { ...r, groupId: null } : r,
-  )
+  const leadsSanitized = leads.map((r) => ({
+    ...r,
+    groupIds: r.groupIds.filter((id) => groupIds.has(id)),
+  }))
 
   let selectedGroupId = data.selectedGroupId
   if (selectedGroupId && !groupIds.has(selectedGroupId)) selectedGroupId = ''
