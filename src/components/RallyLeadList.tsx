@@ -15,7 +15,7 @@ function AssignToGroupDragHandle({ leadId }: { leadId: string }) {
         e.dataTransfer.effectAllowed = 'move'
       }}
       title="Drag into the group drop zone"
-      className="hidden cursor-grab touch-none select-none rounded px-2 py-2 text-amber-500/90 hover:bg-zinc-800 hover:text-amber-400 active:cursor-grabbing sm:inline-flex"
+      className="hidden cursor-grab touch-none select-none rounded px-2 py-2 text-amber-500/90 hover:bg-zinc-800 hover:text-amber-400 active:cursor-grabbing md:inline-flex"
       role="button"
       tabIndex={0}
       aria-label="Drag lead into the selected rally group"
@@ -99,8 +99,9 @@ export function RallyLeadList({
           </div>
           {showHelp ? (
             <p className="mt-0.5 text-sm text-zinc-500">
-              Edit names and march times. Drag leads into groups on desktop, or use
-              Add to on mobile. Roster actions lock while the stage clock is active.
+              Edit names and march times. Drag leads into groups when panels are
+              side-by-side, or use Add to when they are stacked. Roster actions lock
+              while the stage clock is active.
             </p>
           ) : null}
         </div>
@@ -124,19 +125,19 @@ export function RallyLeadList({
         transition={layoutTx}
         className="overflow-x-auto"
       >
-        <table className="w-full min-w-[30rem] text-left text-sm">
+        <table className="w-full min-w-0 text-left text-sm">
           <thead className="border-b border-zinc-800 bg-zinc-900/80 text-xs font-semibold uppercase tracking-wide text-zinc-500">
             <tr>
-              <th scope="col" className="px-4 py-2.5 sm:px-5">
+              <th scope="col" className="px-2.5 py-2.5 sm:px-3.5">
                 Player
               </th>
-              <th scope="col" className="px-4 py-2.5 sm:px-5">
+              <th scope="col" className="px-2.5 py-2.5 sm:px-3.5">
                 March Time
               </th>
-              <th scope="col" className="w-px px-2 py-2.5 sm:px-3">
+              <th scope="col" className="w-px px-1.5 py-2.5 sm:px-2">
                 <span className="sr-only">Assign to group</span>
               </th>
-              <th scope="col" className="w-px px-4 py-2.5 sm:px-5">
+              <th scope="col" className="w-px px-2.5 py-2.5 sm:px-3.5">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -152,7 +153,7 @@ export function RallyLeadList({
               >
                 <td
                   colSpan={4}
-                  className="px-4 py-8 text-center text-zinc-500 sm:px-5"
+                  className="px-2.5 py-8 text-center text-zinc-500 sm:px-3.5"
                 >
                   No leads in the roster. Use &ldquo;Add lead&rdquo; to start,
                   then assign unassigned rows into a group tab.
@@ -170,7 +171,7 @@ export function RallyLeadList({
                     transition={layoutTx}
                     className="align-middle"
                   >
-                    <td className="px-4 py-2 sm:px-5">
+                    <td className="px-2.5 py-2 sm:px-3.5">
                       <label className="sr-only" htmlFor={`name-${row.id}`}>
                         Player name
                       </label>
@@ -189,10 +190,10 @@ export function RallyLeadList({
                             ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-full min-w-[4rem] ${fieldClass}`}
+                        className={`w-full min-w-[5rem] ${fieldClass}`}
                       />
                     </td>
-                    <td className="px-4 py-2 sm:px-5">
+                    <td className="px-2.5 py-2 sm:px-3.5">
                       <label className="sr-only" htmlFor={`time-${row.id}`}>
                         March time mm:ss
                       </label>
@@ -229,10 +230,10 @@ export function RallyLeadList({
                             ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-auto min-w-[1.1rem] max-w-[6rem] font-mono tabular-nums ${fieldClass}`}
+                        className={`w-[4rem] font-mono tabular-nums ${fieldClass}`}
                       />
                     </td>
-                    <td className="w-px px-2 py-2 align-middle sm:px-3">
+                    <td className="w-px px-1.5 py-2 align-middle sm:px-2">
                       <label className="sr-only" htmlFor={`assign-group-${row.id}`}>
                         Assign to group
                       </label>
@@ -246,7 +247,7 @@ export function RallyLeadList({
                           onAssignLead(row.id, groupId)
                           e.currentTarget.value = ''
                         }}
-                        className="w-24 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-60 sm:hidden"
+                        className="w-24 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-60 md:hidden"
                         title={
                           rosterLocked
                             ? 'Reset the stage clock to assign'
@@ -264,7 +265,7 @@ export function RallyLeadList({
                       </select>
                       <AssignToGroupDragHandle leadId={row.id} />
                     </td>
-                    <td className="px-4 py-2 sm:px-5">
+                    <td className="px-2.5 py-2 sm:px-3.5">
                       <button
                         type="button"
                         disabled={rosterLocked}

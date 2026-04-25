@@ -549,7 +549,7 @@ export function RallyGroupPanel({
           transition={layoutTx}
           className="border-b border-zinc-800 bg-zinc-900/35 px-4 py-3 sm:px-5"
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <label
@@ -585,7 +585,7 @@ export function RallyGroupPanel({
                 </p>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <input
                 key={`${selectedGroup.id}-${selectedGroup.targetArrivalGapSeconds}`}
                 id={`target-arrival-gap-${selectedGroup.id}`}
@@ -668,11 +668,16 @@ export function RallyGroupPanel({
               </>
             ) : (
               <>
-                Drop leads here for{' '}
-                <span className="font-medium text-zinc-300">
-                  {groups.find((g) => g.id === selectedGroupId)?.label ?? 'this group'}
+                <span className="hidden md:inline">
+                  Drop leads here for{' '}
+                  <span className="font-medium text-zinc-300">
+                    {groups.find((g) => g.id === selectedGroupId)?.label ?? 'this group'}
+                  </span>
+                  .
                 </span>
-                .
+                <span className="md:hidden">
+                  Use Add to in the roster to assign leads.
+                </span>
               </>
             )}
           </p>
@@ -766,7 +771,7 @@ export function RallyGroupPanel({
                       endMemberDrag()
                     }}
                   >
-                    <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+                    <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-2">
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <MemberReorderDragHandle
                           rowIndex={index}
@@ -783,7 +788,7 @@ export function RallyGroupPanel({
                           {m.name.trim() || '—'}
                         </span>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="ml-auto flex max-w-[65%] shrink-0 flex-wrap items-center justify-end gap-2">
                       {selectedGroup ? (
                         <>
                           {editingMarchOverrideLeadId === m.id ? (
