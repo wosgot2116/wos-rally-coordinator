@@ -1,5 +1,7 @@
+import { LayoutGroup, motion, useReducedMotion } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DND_LEAD_ID_MIME, DND_REORDER_INDEX_MIME } from '../rally/dndMimes'
+import { layoutEaseTransition } from '../rally/layoutMotion'
 import { formatSecondsAsMmSs, parseMmSsToSeconds } from '../rally/timeMmSs'
 import type { RallyGroup, RallyLeadEntry } from '../rally/rallyTypes'
 
@@ -157,6 +159,8 @@ export function RallyGroupPanel({
   onReorderMembers,
 }: RallyGroupPanelProps) {
   const panelLocked = stageClockRunning
+  const prefersReducedMotion = useReducedMotion()
+  const layoutTx = layoutEaseTransition(prefersReducedMotion)
   const [dropActive, setDropActive] = useState(false)
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
@@ -305,7 +309,12 @@ export function RallyGroupPanel({
       className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/40 shadow-sm"
       aria-labelledby="rally-groups-heading"
     >
-      <div className="border-b border-zinc-800 px-4 py-3 sm:px-5">
+      <LayoutGroup id="rally-group-panel">
+      <motion.div
+        layout
+        transition={layoutTx}
+        className="border-b border-zinc-800 px-4 py-3 sm:px-5"
+      >
         <div className="flex items-center gap-2">
           <h2
             id="rally-groups-heading"
@@ -330,9 +339,13 @@ export function RallyGroupPanel({
             tab. Group controls lock while the stage clock is active.
           </p>
         ) : null}
-      </div>
+      </motion.div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2 sm:px-5">
+        <motion.div
+          layout
+          transition={layoutTx}
+          className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2 sm:px-5"
+        >
         {groups.map((g) => {
           const selected = g.id === selectedGroupId
           const editing = editingTargetId === g.id
@@ -340,8 +353,10 @@ export function RallyGroupPanel({
 
           if (editing) {
             return (
-              <div
+              <motion.div
                 key={g.id}
+                layout
+                transition={layoutTx}
                 className="inline-flex min-w-[10rem] items-center rounded-lg border border-amber-500 bg-zinc-950 px-1 py-0.5 shadow-sm"
               >
                 <input
@@ -364,14 +379,16 @@ export function RallyGroupPanel({
                   aria-label="Group name"
                   className="w-full min-w-[8rem] rounded-md border-0 bg-transparent px-2 py-1.5 text-sm font-semibold text-zinc-100 outline-none ring-0 placeholder:text-zinc-500 read-only:cursor-not-allowed read-only:opacity-70"
                 />
-              </div>
+              </motion.div>
             )
           }
 
           return (
-            <div
+            <motion.div
               key={g.id}
-              className={`inline-flex items-stretch overflow-hidden rounded-lg border text-sm font-semibold transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-300 ${
+              layout
+              transition={layoutTx}
+              className={`inline-flex items-stretch overflow-hidden rounded-lg border text-sm font-semibold transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-300 ${
                 selected
                   ? 'border-amber-400 shadow-sm'
                   : 'border-zinc-700 hover:border-zinc-500'
@@ -506,10 +523,12 @@ export function RallyGroupPanel({
                   )}
                 </>
               ) : null}
-            </div>
+            </motion.div>
           )
         })}
-        <button
+        <motion.button
+          layout
+          transition={layoutTx}
           type="button"
           disabled={panelLocked}
           onClick={onAddGroup}
@@ -518,14 +537,18 @@ export function RallyGroupPanel({
               ? 'Reset the stage clock to add a group'
               : undefined
           }
-          className="rounded-lg border border-dashed border-zinc-600 px-3 py-1.5 text-sm font-medium text-zinc-400 transition hover:border-zinc-500 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg border border-dashed border-zinc-600 px-3 py-1.5 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Add group
-        </button>
-      </div>
+        </motion.button>
+        </motion.div>
 
       {selectedGroup ? (
-        <div className="border-b border-zinc-800 bg-zinc-900/35 px-4 py-3 sm:px-5">
+        <motion.div
+          layout
+          transition={layoutTx}
+          className="border-b border-zinc-800 bg-zinc-900/35 px-4 py-3 sm:px-5"
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -597,11 +620,13 @@ export function RallyGroupPanel({
               <span className="pb-2 text-xs font-medium text-zinc-500">sec</span>
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : null}
 
-      <div className="p-4 sm:p-5">
-        <div
+      <motion.div layout transition={layoutTx} className="p-4 sm:p-5">
+        <motion.div
+          layout
+          transition={layoutTx}
           role="tabpanel"
           aria-label="Active group drop zone"
           className={`rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
@@ -657,15 +682,22 @@ export function RallyGroupPanel({
               No leads in this group yet.
             </p>
           ) : (
-            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/60">
+            <motion.div
+              layout
+              transition={layoutTx}
+              className="mt-4 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/60"
+            >
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:px-3">
                 <span>Lead</span>
                 <span>March Time / Actions</span>
               </div>
-              <ul className="divide-y divide-zinc-800">
+              <LayoutGroup id="rally-group-members">
+                <ul className="divide-y divide-zinc-800">
                 {members.map((m, index) => (
-                  <li
+                  <motion.li
                     key={m.id}
+                    layout
+                    transition={layoutTx}
                     data-member-row-index={index}
                     className={`flex flex-wrap items-center gap-2 px-2 py-2 transition-colors sm:px-3 ${
                       dragFromIndex === index ? 'opacity-40' : ''
@@ -962,13 +994,15 @@ export function RallyGroupPanel({
                       </button>
                       </div>
                     </div>
-                  </li>
+                  </motion.li>
                 ))}
-              </ul>
-            </div>
+                </ul>
+              </LayoutGroup>
+            </motion.div>
           )}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
+      </LayoutGroup>
     </section>
   )
 }

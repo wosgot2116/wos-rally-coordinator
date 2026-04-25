@@ -1,5 +1,7 @@
+import { LayoutGroup, motion, useReducedMotion } from 'framer-motion'
 import { useState } from 'react'
 import { DND_LEAD_ID_MIME } from '../rally/dndMimes'
+import { layoutEaseTransition } from '../rally/layoutMotion'
 import type { RallyGroup, RallyLeadEntry } from '../rally/rallyTypes'
 import { formatSecondsAsMmSs, parseMmSsToSeconds } from '../rally/timeMmSs'
 
@@ -57,6 +59,8 @@ export function RallyLeadList({
   onRemoveLead,
   onAddLead,
 }: RallyLeadListProps) {
+  const prefersReducedMotion = useReducedMotion()
+  const layoutTx = layoutEaseTransition(prefersReducedMotion)
   const [timeDraftById, setTimeDraftById] = useState<Record<string, string>>({})
   const [showHelp, setShowHelp] = useState(false)
   const rosterLocked = stageClockRunning
@@ -69,7 +73,12 @@ export function RallyLeadList({
       className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/40 shadow-sm"
       aria-labelledby="rally-roster-heading"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 sm:px-5">
+      <LayoutGroup id="rally-roster-panel">
+      <motion.div
+        layout
+        transition={layoutTx}
+        className="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 sm:px-5"
+      >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2
@@ -108,9 +117,13 @@ export function RallyLeadList({
         >
           Add lead
         </button>
-      </div>
+      </motion.div>
 
-      <div className="overflow-x-auto">
+      <motion.div
+        layout
+        transition={layoutTx}
+        className="overflow-x-auto"
+      >
         <table className="w-full min-w-[30rem] text-left text-sm">
           <thead className="border-b border-zinc-800 bg-zinc-900/80 text-xs font-semibold uppercase tracking-wide text-zinc-500">
             <tr>
@@ -128,9 +141,15 @@ export function RallyLeadList({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <LayoutGroup id="rally-roster-rows">
+            <tbody className="divide-y divide-zinc-800">
             {rows.length === 0 ? (
-              <tr>
+              <motion.tr
+                layout
+                transition={layoutTx}
+                key="roster-empty"
+                className="align-middle"
+              >
                 <td
                   colSpan={4}
                   className="px-4 py-8 text-center text-zinc-500 sm:px-5"
@@ -138,14 +157,19 @@ export function RallyLeadList({
                   No leads in the roster. Use &ldquo;Add lead&rdquo; to start,
                   then assign unassigned rows into a group tab.
                 </td>
-              </tr>
+              </motion.tr>
             ) : (
               rows.map((row) => {
                 const fieldClass =
                   'rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900/80 disabled:text-zinc-500 disabled:opacity-80'
 
                 return (
-                  <tr key={row.id} className="align-middle">
+                  <motion.tr
+                    key={row.id}
+                    layout
+                    transition={layoutTx}
+                    className="align-middle"
+                  >
                     <td className="px-4 py-2 sm:px-5">
                       <label className="sr-only" htmlFor={`name-${row.id}`}>
                         Player name
@@ -260,13 +284,15 @@ export function RallyLeadList({
                         Remove
                       </button>
                     </td>
-                  </tr>
+                  </motion.tr>
                 )
               })
             )}
-          </tbody>
+            </tbody>
+          </LayoutGroup>
         </table>
-      </div>
+      </motion.div>
+      </LayoutGroup>
     </section>
   )
 }
