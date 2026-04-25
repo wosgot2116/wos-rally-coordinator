@@ -6,15 +6,22 @@ import type { RallyGroup, RallyLeadEntry } from '../rally/rallyTypes'
 const UUID_RE =
   /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
+/** Pixels of movement before treating as a touch drag (avoids blocking taps). */
+const TOUCH_REORDER_THRESHOLD_PX = 12
+
 function MemberReorderDragHandle({
   rowIndex,
   onDragStart,
   onDragEnd,
+  onTouchPosition,
+  onTouchFinish,
   disabled,
 }: {
   rowIndex: number
   onDragStart: () => void
   onDragEnd: () => void
+  onTouchPosition: (clientX: number, clientY: number) => void
+  onTouchFinish: (didDrag: boolean) => void
   disabled: boolean
 }) {
   if (disabled) {
@@ -52,6 +59,42 @@ function MemberReorderDragHandle({
         onDragStart()
       }}
       onDragEnd={onDragEnd}
+      onTouchStart={(e) => {
+        if (disabled || e.touches.length !== 1) return
+        const t0 = e.touches[0]
+        const startX = t0.clientX
+        const startY = t0.clientY
+        let armedDrag = false
+
+        const onMove = (ev: TouchEvent) => {
+          if (ev.touches.length !== 1) return
+          const t = ev.touches[0]
+          const dx = t.clientX - startX
+          const dy = t.clientY - startY
+          if (dx * dx + dy * dy < TOUCH_REORDER_THRESHOLD_PX ** 2) return
+          if (!armedDrag) {
+            armedDrag = true
+            onDragStart()
+          }
+          ev.preventDefault()
+          onTouchPosition(t.clientX, t.clientY)
+        }
+
+        const onEnd = (ev: TouchEvent) => {
+          window.removeEventListener('touchmove', onMove)
+          window.removeEventListener('touchend', onEnd)
+          window.removeEventListener('touchcancel', onEnd)
+          if (armedDrag && ev.changedTouches[0]) {
+            const t = ev.changedTouches[0]
+            onTouchPosition(t.clientX, t.clientY)
+          }
+          onTouchFinish(armedDrag)
+        }
+
+        window.addEventListener('touchmove', onMove, { passive: false })
+        window.addEventListener('touchend', onEnd)
+        window.addEventListener('touchcancel', onEnd)
+      }}
       title="Drag to reorder in this group"
       className="inline-flex cursor-grab touch-none select-none rounded px-1 py-2 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 active:cursor-grabbing"
       role="button"
@@ -112,6 +155,7 @@ export function RallyGroupPanel({
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const dragFromIndexRef = useRef<number | null>(null)
+  const touchDropIndexRef = useRef<number | null>(null)
 
   const endHighlight = useCallback(() => {
     setDropActive(false)
@@ -119,9 +163,63 @@ export function RallyGroupPanel({
 
   const endMemberDrag = useCallback(() => {
     dragFromIndexRef.current = null
+    touchDropIndexRef.current = null
     setDragFromIndex(null)
     setDragOverIndex(null)
   }, [])
+
+  const updateTouchDropHighlight = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = document.elementFromPoint(clientX, clientY)
+      if (!el) {
+        touchDropIndexRef.current = null
+        setDragOverIndex(null)
+        return
+      }
+      const row = el.closest('[data-member-row-index]')
+      if (!row || !(row instanceof HTMLElement)) {
+        touchDropIndexRef.current = null
+        setDragOverIndex(null)
+        return
+      }
+      const raw = row.getAttribute('data-member-row-index')
+      const idx = raw === null ? NaN : Number.parseInt(raw, 10)
+      if (
+        !Number.isFinite(idx) ||
+        idx < 0 ||
+        idx >= members.length
+      ) {
+        touchDropIndexRef.current = null
+        setDragOverIndex(null)
+        return
+      }
+      touchDropIndexRef.current = idx
+      setDragOverIndex(idx)
+    },
+    [members.length],
+  )
+
+  const finishTouchReorder = useCallback(
+    (didDrag: boolean) => {
+      if (didDrag) {
+        const from = dragFromIndexRef.current
+        const to = touchDropIndexRef.current
+        if (
+          from !== null &&
+          to !== null &&
+          from !== to &&
+          from >= 0 &&
+          to >= 0 &&
+          from < members.length &&
+          to < members.length
+        ) {
+          onReorderMembers(from, to)
+        }
+      }
+      endMemberDrag()
+    },
+    [endMemberDrag, members.length, onReorderMembers],
+  )
 
   const hasLeadPayload = (dt: DataTransfer) =>
     dt.types.includes(DND_LEAD_ID_MIME)
@@ -147,6 +245,7 @@ export function RallyGroupPanel({
     setRenameDraft('')
     setDropActive(false)
     dragFromIndexRef.current = null
+    touchDropIndexRef.current = null
     setDragFromIndex(null)
     setDragOverIndex(null)
   }, [panelLocked])
@@ -421,6 +520,7 @@ export function RallyGroupPanel({
               {members.map((m, index) => (
                 <li
                   key={m.id}
+                  data-member-row-index={index}
                   className={`flex flex-wrap items-center gap-2 px-2 py-2 transition-colors sm:px-3 ${
                     dragFromIndex === index ? 'opacity-40' : ''
                   } ${
@@ -432,6 +532,12 @@ export function RallyGroupPanel({
                   }`}
                   onDragOver={(e) => {
                     if (panelLocked) return
+                    if (hasLeadPayload(e.dataTransfer)) {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      setDropActive(true)
+                      return
+                    }
                     if (!e.dataTransfer.types.includes(DND_REORDER_INDEX_MIME)) {
                       return
                     }
@@ -448,6 +554,20 @@ export function RallyGroupPanel({
                   }}
                   onDrop={(e) => {
                     if (panelLocked) return
+                    if (hasLeadPayload(e.dataTransfer)) {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      endHighlight()
+                      let id = e.dataTransfer.getData(DND_LEAD_ID_MIME)
+                      if (!id) {
+                        const plain = e.dataTransfer.getData('text/plain').trim()
+                        if (UUID_RE.test(plain)) id = plain
+                      }
+                      if (id) {
+                        onAssignLead(id, selectedGroupId)
+                      }
+                      return
+                    }
                     e.preventDefault()
                     e.stopPropagation()
                     const fromStr = e.dataTransfer.getData(DND_REORDER_INDEX_MIME)
@@ -478,6 +598,8 @@ export function RallyGroupPanel({
                           setDragFromIndex(index)
                         }}
                         onDragEnd={endMemberDrag}
+                        onTouchPosition={updateTouchDropHighlight}
+                        onTouchFinish={finishTouchReorder}
                       />
                       <span className="min-w-0 truncate font-medium text-zinc-200">
                         {m.name.trim() || '—'}

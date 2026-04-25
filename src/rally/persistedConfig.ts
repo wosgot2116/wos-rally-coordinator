@@ -21,10 +21,15 @@ function normalizeGroup(raw: Record<string, unknown>): RallyGroup | null {
       : typeof raw.arrivalOffsetSeconds === 'number'
         ? raw.arrivalOffsetSeconds
         : 0
+  const orderRaw = raw.memberOrderIds
+  const memberOrderIds = Array.isArray(orderRaw)
+    ? orderRaw.filter((id): id is string => typeof id === 'string')
+    : []
   return {
     id: raw.id,
     label: raw.label,
     targetArrivalGapSeconds: Math.max(0, Math.floor(Number.isFinite(gap) ? gap : 0)),
+    memberOrderIds,
   }
 }
 

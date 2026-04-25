@@ -7,6 +7,11 @@ export type RallyGroup = {
    * (T₀ chosen so rally departures are non‑negative). 0 = same target instant for all.
    */
   targetArrivalGapSeconds: number
+  /**
+   * Lead ids in departure / script order for this group only.
+   * Roster order is the `leads` array; this list does not reorder the roster.
+   */
+  memberOrderIds: string[]
 }
 
 export type RallyLeadEntry = {
@@ -35,5 +40,6 @@ export function createGroup(label: string): RallyGroup {
     id: crypto.randomUUID(),
     label,
     targetArrivalGapSeconds: 0,
+    memberOrderIds: [],
   }
 }

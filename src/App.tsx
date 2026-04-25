@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RallyGroupPanel } from './components/RallyGroupPanel'
 import { RallyLeadList } from './components/RallyLeadList'
 import { StageClock } from './components/StageClock'
-import { moveWithinSubset } from './rally/leadListOps'
+import { moveIndex, orderLeadsForGroup } from './rally/leadListOps'
 import {
   buildScriptEvents,
   computeDepartureRows,
@@ -40,6 +40,8 @@ function App() {
   const [leads, setLeads] = useState<RallyLeadEntry[]>(
     () => loadBootstrapConfig().leads,
   )
+  const leadsRef = useRef(leads)
+  leadsRef.current = leads
 
   const activeGroupId = useMemo(() => {
     if (groups.length === 0) return ''
@@ -49,10 +51,14 @@ function App() {
 
   const selectedGroup = groups.find((g) => g.id === activeGroupId)
 
-  const groupMembers = useMemo(
-    () => leads.filter((l) => l.groupIds.includes(activeGroupId)),
-    [leads, activeGroupId],
-  )
+  const groupMembers = useMemo(() => {
+    if (!activeGroupId || !selectedGroup) return []
+    return orderLeadsForGroup(
+      leads,
+      activeGroupId,
+      selectedGroup.memberOrderIds,
+    )
+  }, [leads, activeGroupId, selectedGroup])
 
   const lastScriptSecondIndex = useMemo(() => {
     if (!selectedGroup || groupMembers.length === 0) return -1
@@ -66,9 +72,20 @@ function App() {
   const handleReorderGroupMembers = useCallback(
     (groupId: string, from: number, to: number) => {
       if (!groupId) return
-      setLeads((prev) =>
-        moveWithinSubset(prev, (l) => l.groupIds.includes(groupId), from, to),
-      )
+      setGroups((prevGroups) => {
+        const g = prevGroups.find((x) => x.id === groupId)
+        if (!g) return prevGroups
+        const ordered = orderLeadsForGroup(
+          leadsRef.current,
+          groupId,
+          g.memberOrderIds,
+        )
+        const ids = ordered.map((l) => l.id)
+        const nextIds = moveIndex(ids, from, to)
+        return prevGroups.map((x) =>
+          x.id === groupId ? { ...x, memberOrderIds: nextIds } : x,
+        )
+      })
     },
     [],
   )
@@ -84,6 +101,12 @@ function App() {
 
   const handleRemoveLead = useCallback((id: string) => {
     setLeads((prev) => prev.filter((r) => r.id !== id))
+    setGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        memberOrderIds: g.memberOrderIds.filter((mid) => mid !== id),
+      })),
+    )
   }, [])
 
   const handleAddLead = useCallback(() => {
@@ -98,6 +121,13 @@ function App() {
           : r,
       ),
     )
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g
+        if (g.memberOrderIds.includes(leadId)) return g
+        return { ...g, memberOrderIds: [...g.memberOrderIds, leadId] }
+      }),
+    )
   }, [])
 
   const handleReturnToSource = useCallback((leadId: string, groupId: string) => {
@@ -106,6 +136,16 @@ function App() {
         r.id === leadId
           ? { ...r, groupIds: r.groupIds.filter((id) => id !== groupId) }
           : r,
+      ),
+    )
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              memberOrderIds: g.memberOrderIds.filter((id) => id !== leadId),
+            }
+          : g,
       ),
     )
   }, [])
