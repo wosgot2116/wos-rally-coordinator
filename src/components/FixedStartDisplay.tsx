@@ -22,6 +22,8 @@ type FixedStartDisplayProps = {
   membersCount: number
   manualStartTime: string
   onManualStartTimeChange: (value: string) => void
+  rallyTimeMinutes: 1 | 3 | 5
+  onRallyTimeMinutesChange: (value: 1 | 3 | 5) => void
   manualStartSeconds: number | null
   manualScheduleRows: FixedStartScheduleRow[]
 }
@@ -31,6 +33,8 @@ export function FixedStartDisplay({
   membersCount,
   manualStartTime,
   onManualStartTimeChange,
+  rallyTimeMinutes,
+  onRallyTimeMinutesChange,
   manualStartSeconds,
   manualScheduleRows,
 }: FixedStartDisplayProps) {
@@ -103,6 +107,28 @@ export function FixedStartDisplay({
   const rowTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const }
+  const showFromStartHours = sortedScheduleRows.some(
+    (row) => Math.floor(row.fromStartSeconds / 3600) > 0,
+  )
+  const showFromStartMinutes =
+    showFromStartHours ||
+    sortedScheduleRows.some(
+      (row) => Math.floor((row.fromStartSeconds % 3600) / 60) > 0,
+    )
+
+  const formatFromStartValue = (totalSeconds: number) => {
+    const seconds = Math.max(0, Math.floor(totalSeconds))
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    if (showFromStartHours) {
+      return `+${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    }
+    if (showFromStartMinutes) {
+      return `+${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    }
+    return `+${String(secs).padStart(2, '0')}`
+  }
 
   return (
     <>
@@ -111,7 +137,7 @@ export function FixedStartDisplay({
           {cueHeading}
         </div>
       ) : null}
-      <div className="mt-4 w-full max-w-2xl rounded-xl border border-zinc-800/90 bg-zinc-950/70 p-4 shadow-inner sm:p-5 mx-auto">
+      <div className="mt-4 w-full max-w-3xl rounded-xl border border-zinc-800/90 bg-zinc-950/70 p-4 shadow-inner sm:p-5 mx-auto">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Manual Rally Starts
@@ -143,6 +169,22 @@ export function FixedStartDisplay({
                 aria-label="Fixed start time in 24-hour format HH:MM:SS"
                 className="h-8 w-24 rounded border border-zinc-700 bg-zinc-950 px-2 py-0 font-mono text-sm tabular-nums text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
               />
+            </label>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300">
+              <span className="text-xs uppercase tracking-wide text-zinc-500">
+                Rally Time
+              </span>
+              <select
+                value={rallyTimeMinutes}
+                onChange={(e) =>
+                  onRallyTimeMinutesChange(Number(e.target.value) as 1 | 3 | 5)
+                }
+                className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 py-0 text-sm text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+              >
+                <option value={1}>1 minute</option>
+                <option value={3}>3 minutes</option>
+                <option value={5}>5 minutes</option>
+              </select>
             </label>
             <button
               type="button"
@@ -240,7 +282,7 @@ export function FixedStartDisplay({
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-right font-mono tabular-nums text-zinc-300">
-                        {row.offsetFromStart}
+                        {formatFromStartValue(row.fromStartSeconds)}
                       </td>
                       <td className="px-2 py-2.5 text-right font-mono tabular-nums text-amber-200">
                         {row.startAt}

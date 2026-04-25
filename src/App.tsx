@@ -24,6 +24,7 @@ import {
 
 type RunState = 'idle' | 'running' | 'paused'
 type DisplayMode = 'caller-script' | 'manual-starts'
+type RallyTimeMinutes = 1 | 3 | 5
 const MIN_BPM = 30
 const MAX_BPM = 300
 const UI_SETTINGS_STORAGE_KEY = 'wos-rally-timer:ui-settings:v1'
@@ -31,6 +32,7 @@ const UI_SETTINGS_STORAGE_KEY = 'wos-rally-timer:ui-settings:v1'
 type PersistedUiSettings = {
   displayMode: DisplayMode
   manualStartTime: string
+  rallyTimeMinutes: RallyTimeMinutes
   metronomeRunning: boolean
   metronomeBpm: number
   metronomeOnlyWhenScriptRunning: boolean
@@ -47,6 +49,7 @@ function loadUiSettings(): PersistedUiSettings | null {
     if (
       (data.displayMode !== 'caller-script' && data.displayMode !== 'manual-starts') ||
       typeof data.manualStartTime !== 'string' ||
+      typeof data.rallyTimeMinutes !== 'number' ||
       typeof data.metronomeRunning !== 'boolean' ||
       typeof data.metronomeBpm !== 'number' ||
       typeof data.metronomeOnlyWhenScriptRunning !== 'boolean'
@@ -56,6 +59,7 @@ function loadUiSettings(): PersistedUiSettings | null {
     return {
       displayMode: data.displayMode,
       manualStartTime: normalizeManualStartTime(data.manualStartTime),
+      rallyTimeMinutes: normalizeRallyTimeMinutes(data.rallyTimeMinutes),
       metronomeRunning: data.metronomeRunning,
       metronomeBpm: clampBpm(data.metronomeBpm),
       metronomeOnlyWhenScriptRunning: data.metronomeOnlyWhenScriptRunning,
@@ -87,6 +91,11 @@ function normalizeManualStartTime(value: string): string {
     return '00:00:00'
   }
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function normalizeRallyTimeMinutes(value: unknown): RallyTimeMinutes {
+  if (value === 1 || value === 3 || value === 5) return value
+  return 1
 }
 
 function clampBpm(value: number): number {
@@ -319,6 +328,9 @@ function App() {
   const [manualStartTime, setManualStartTime] = useState(
     () => uiBootstrap?.manualStartTime ?? '00:00:00',
   )
+  const [rallyTimeMinutes, setRallyTimeMinutes] = useState<RallyTimeMinutes>(
+    () => uiBootstrap?.rallyTimeMinutes ?? 1,
+  )
   const [metronomeModalOpen, setMetronomeModalOpen] = useState(false)
   const [metronomeRunning, setMetronomeRunning] = useState(
     () => uiBootstrap?.metronomeRunning ?? false,
@@ -374,6 +386,7 @@ function App() {
     writeUiSettings({
       displayMode,
       manualStartTime,
+      rallyTimeMinutes,
       metronomeRunning,
       metronomeBpm,
       metronomeOnlyWhenScriptRunning,
@@ -381,6 +394,7 @@ function App() {
   }, [
     displayMode,
     manualStartTime,
+    rallyTimeMinutes,
     metronomeRunning,
     metronomeBpm,
     metronomeOnlyWhenScriptRunning,
@@ -740,6 +754,10 @@ function App() {
             displayMode={displayMode}
             manualStartTime={manualStartTime}
             onManualStartTimeChange={handleManualStartTimeChange}
+            rallyTimeMinutes={rallyTimeMinutes}
+            onRallyTimeMinutesChange={(value) =>
+              setRallyTimeMinutes(normalizeRallyTimeMinutes(value))
+            }
             marchTimeOverrideSecondsByLeadId={
               selectedGroup?.marchTimeOverrideSecondsByLeadId ?? {}
             }

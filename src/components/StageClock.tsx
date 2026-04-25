@@ -17,6 +17,8 @@ type StageClockProps = {
   displayMode: 'caller-script' | 'manual-starts'
   manualStartTime: string
   onManualStartTimeChange: (value: string) => void
+  rallyTimeMinutes: 1 | 3 | 5
+  onRallyTimeMinutesChange: (value: 1 | 3 | 5) => void
   marchTimeOverrideSecondsByLeadId: Record<string, number>
   /** Same clock as the stage timer (whole seconds drive the caller script). */
   elapsedMs: number
@@ -32,6 +34,8 @@ export function StageClock({
   displayMode,
   manualStartTime,
   onManualStartTimeChange,
+  rallyTimeMinutes,
+  onRallyTimeMinutesChange,
   marchTimeOverrideSecondsByLeadId,
   elapsedMs,
   stageActions,
@@ -81,7 +85,8 @@ export function StageClock({
         Math.floor((lead?.marchTimeSeconds ?? 0) + (lead?.travelTimeSeconds ?? 0)),
       )
       const totalSeconds = ((manualStartSeconds + row.departureSec) % 86400 + 86400) % 86400
-      const arrivalTotalSeconds = (totalSeconds + marchTimeUsedSeconds) % 86400
+      const arrivalTotalSeconds =
+        (totalSeconds + rallyTimeMinutes * 60 + marchTimeUsedSeconds) % 86400
       const offsetHours = Math.floor(row.departureSec / 3600)
       const offsetMinutes = Math.floor((row.departureSec % 3600) / 60)
       const offsetSeconds = row.departureSec % 60
@@ -112,7 +117,13 @@ export function StageClock({
         }
         return a.order - b.order
       })
-  }, [manualStartSeconds, rows, members, marchTimeOverrideSecondsByLeadId])
+  }, [
+    manualStartSeconds,
+    rows,
+    members,
+    marchTimeOverrideSecondsByLeadId,
+    rallyTimeMinutes,
+  ])
 
   if (displayMode === 'manual-starts') {
     return (
@@ -121,6 +132,8 @@ export function StageClock({
         membersCount={members.length}
         manualStartTime={manualStartTime}
         onManualStartTimeChange={onManualStartTimeChange}
+        rallyTimeMinutes={rallyTimeMinutes}
+        onRallyTimeMinutesChange={onRallyTimeMinutesChange}
         manualStartSeconds={manualStartSeconds}
         manualScheduleRows={manualScheduleRows}
       />
