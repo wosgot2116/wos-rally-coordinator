@@ -800,7 +800,9 @@ export function RallyGroupPanel({
                               <input
                                 id={`group-march-time-${selectedGroup.id}-${m.id}`}
                                 type="text"
-                                inputMode="numeric"
+                                inputMode="text"
+                                autoCapitalize="off"
+                                autoCorrect="off"
                                 autoFocus
                                 value={
                                   marchOverrideDraftByLeadId[m.id] ??

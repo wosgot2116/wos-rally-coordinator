@@ -199,7 +199,9 @@ export function RallyLeadList({
                       <input
                         id={`time-${row.id}`}
                         type="text"
-                        inputMode="numeric"
+                        inputMode="text"
+                        autoCapitalize="off"
+                        autoCorrect="off"
                         value={timeDisplayValue(row)}
                         onChange={(e) => {
                           setTimeDraftById((d) => ({
@@ -227,7 +229,7 @@ export function RallyLeadList({
                             ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-full max-w-[5rem] font-mono tabular-nums ${fieldClass}`}
+                        className={`w-auto min-w-[1.1rem] max-w-[6rem] font-mono tabular-nums ${fieldClass}`}
                       />
                     </td>
                     <td className="w-px px-2 py-2 align-middle sm:px-3">
