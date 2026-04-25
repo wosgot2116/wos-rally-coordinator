@@ -696,7 +696,7 @@ function App() {
             <div className="flex items-center gap-2">
               <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300">
                 <span className="text-xs uppercase tracking-wide text-zinc-500">
-                  Display mode
+                  Mode
                 </span>
                 <select
                   value={displayMode}
