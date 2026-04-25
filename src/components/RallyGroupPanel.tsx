@@ -421,7 +421,7 @@ export function RallyGroupPanel({
 
       {selectedGroup ? (
         <div className="border-b border-zinc-800 bg-zinc-900/35 px-4 py-3 sm:px-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <label
                 htmlFor={`target-arrival-gap-${selectedGroup.id}`}
@@ -430,10 +430,8 @@ export function RallyGroupPanel({
                 Target arrival gap
               </label>
               <p className="mt-0.5 max-w-xl text-xs leading-snug text-zinc-500">
-                Extra seconds between each lead&apos;s target fort arrival in list
-                order (0 = same arrival time; longer march times are called out
-                first). Each next lead&apos;s arrival goal is this many seconds after
-                the previous. Default is 0.
+                Seconds between target arrivals in list order. 0 means same
+                arrival time; default is 0.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

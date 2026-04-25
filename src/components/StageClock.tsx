@@ -51,22 +51,27 @@ export function StageClock({
   )
 
   return (
-    <div
-      className={`mt-4 grid w-full items-start gap-8 ${
-        showScriptStack
-          ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
-          : 'grid-cols-1 justify-items-center'
-      }`}
-    >
+    <>
+      {cueHeading ? (
+        <div className="mt-0 mb-1 text-center font-display text-xl font-semibold tracking-wide text-zinc-300">
+          {cueHeading}
+        </div>
+      ) : null}
+      <div
+        className={`mt-4 grid w-full items-start gap-8 ${
+          showScriptStack
+            ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
+            : 'grid-cols-1 justify-items-center'
+        }`}
+      >
       <div className={`min-w-0 text-center ${showScriptStack ? '' : 'w-full max-w-4xl'}`}>
         {stageActions}
-        {cueHeading ? (
-          <div className="mt-8 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-            {cueHeading}
-          </div>
-        ) : null}
         <div
-          className="mt-4 min-h-[7.5rem] font-display text-6xl font-bold leading-[0.95] tracking-tight text-white sm:min-h-[9rem] sm:text-7xl md:min-h-[10rem] md:text-8xl lg:min-h-[11rem] lg:text-9xl xl:min-h-[12rem] xl:text-[8.5rem] 2xl:text-[10rem]"
+          className={`mt-4 font-display font-bold leading-[0.95] tracking-tight text-white break-words ${
+            showScriptStack
+              ? 'min-h-[6.5rem] text-5xl sm:min-h-[7rem] sm:text-6xl md:min-h-[8rem] md:text-7xl lg:min-h-[9rem] lg:text-8xl xl:text-[7rem] 2xl:text-[8rem]'
+              : 'min-h-[7.5rem] text-6xl sm:min-h-[9rem] sm:text-7xl md:min-h-[10rem] md:text-8xl lg:min-h-[11rem] lg:text-9xl xl:min-h-[12rem] xl:text-[8.5rem] 2xl:text-[10rem]'
+          }`}
           aria-live="assertive"
         >
           {members.length === 0 ? (
@@ -135,6 +140,7 @@ export function StageClock({
           ) : null}
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   )
 }

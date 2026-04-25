@@ -190,7 +190,7 @@ export function RallyLeadList({
                             ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-22 font-mono tabular-nums ${fieldClass}`}
+                        className={`w-full max-w-[5rem] font-mono tabular-nums ${fieldClass}`}
                       />
                     </td>
                     <td className="w-px px-2 py-2 align-middle sm:px-3">

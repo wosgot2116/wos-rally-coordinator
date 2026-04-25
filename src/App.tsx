@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import woodblockSound from './assets/woodblock.mp3'
+import { MetronomeModal } from './components/MetronomeModal'
 import { RallyGroupPanel } from './components/RallyGroupPanel'
 import { RallyLeadList } from './components/RallyLeadList'
 import { StageClock } from './components/StageClock'
@@ -21,6 +23,57 @@ import {
 } from './rally/rallyTypes'
 
 type RunState = 'idle' | 'running' | 'paused'
+const MIN_BPM = 30
+const MAX_BPM = 300
+const UI_SETTINGS_STORAGE_KEY = 'wos-rally-timer:ui-settings:v1'
+
+type PersistedUiSettings = {
+  showScriptStack: boolean
+  metronomeRunning: boolean
+  metronomeBpm: number
+  metronomeOnlyWhenScriptRunning: boolean
+}
+
+function loadUiSettings(): PersistedUiSettings | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(UI_SETTINGS_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const data = parsed as Record<string, unknown>
+    if (
+      typeof data.showScriptStack !== 'boolean' ||
+      typeof data.metronomeRunning !== 'boolean' ||
+      typeof data.metronomeBpm !== 'number' ||
+      typeof data.metronomeOnlyWhenScriptRunning !== 'boolean'
+    ) {
+      return null
+    }
+    return {
+      showScriptStack: data.showScriptStack,
+      metronomeRunning: data.metronomeRunning,
+      metronomeBpm: clampBpm(data.metronomeBpm),
+      metronomeOnlyWhenScriptRunning: data.metronomeOnlyWhenScriptRunning,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeUiSettings(settings: PersistedUiSettings): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function clampBpm(value: number): number {
+  if (!Number.isFinite(value)) return MIN_BPM
+  return Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(value)))
+}
 
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms))
@@ -31,6 +84,7 @@ function formatElapsed(ms: number): string {
 }
 
 function App() {
+  const uiBootstrap = useMemo(() => loadUiSettings(), [])
   const [groups, setGroups] = useState<RallyGroup[]>(
     () => loadBootstrapConfig().groups,
   )
@@ -222,7 +276,28 @@ function App() {
 
   const [runState, setRunState] = useState<RunState>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
-  const [showScriptStack, setShowScriptStack] = useState(false)
+  const [showScriptStack, setShowScriptStack] = useState(
+    () => uiBootstrap?.showScriptStack ?? false,
+  )
+  const [metronomeModalOpen, setMetronomeModalOpen] = useState(false)
+  const [metronomeRunning, setMetronomeRunning] = useState(
+    () => uiBootstrap?.metronomeRunning ?? false,
+  )
+  const [metronomeBpm, setMetronomeBpm] = useState(
+    () => uiBootstrap?.metronomeBpm ?? 60,
+  )
+  const [metronomeOnlyWhenScriptRunning, setMetronomeOnlyWhenScriptRunning] =
+    useState(() => uiBootstrap?.metronomeOnlyWhenScriptRunning ?? false)
+  const [callerGroupMenuOpen, setCallerGroupMenuOpen] = useState(false)
+  const callerGroupMenuRef = useRef<HTMLDivElement | null>(null)
+  const metronomeAudioContextRef = useRef<AudioContext | null>(null)
+  const metronomeBufferRef = useRef<AudioBuffer | null>(null)
+  const metronomeLastTickPerfMsRef = useRef<number | null>(null)
+  const metronomeIntervalIdRef = useRef<number | null>(null)
+  const metronomeWasAudibleRef = useRef(false)
+  const scriptSyncedToMetronomeRef = useRef(false)
+  const scriptSyncBaseElapsedMsRef = useRef(0)
+  const scriptSyncAnchorPerfMsRef = useRef(0)
   const baseMsRef = useRef(0)
   const anchorRef = useRef(0)
   /** Elapsed ms at which to auto-reset: 3s after the last script second ends. */
@@ -241,6 +316,9 @@ function App() {
     setRunState('idle')
     baseMsRef.current = 0
     setElapsedMs(0)
+    scriptSyncedToMetronomeRef.current = false
+    scriptSyncBaseElapsedMsRef.current = 0
+    scriptSyncAnchorPerfMsRef.current = 0
   }, [])
 
   useEffect(() => {
@@ -251,6 +329,20 @@ function App() {
       selectedGroupId,
     })
   }, [groups, leads, selectedGroupId])
+
+  useEffect(() => {
+    writeUiSettings({
+      showScriptStack,
+      metronomeRunning,
+      metronomeBpm,
+      metronomeOnlyWhenScriptRunning,
+    })
+  }, [
+    showScriptStack,
+    metronomeRunning,
+    metronomeBpm,
+    metronomeOnlyWhenScriptRunning,
+  ])
 
   const clearStoredConfig = useCallback(() => {
     clearPersistedConfig()
@@ -267,7 +359,16 @@ function App() {
     let frame = 0
 
     const step = () => {
-      const next = baseMsRef.current + (performance.now() - anchorRef.current)
+      const rawElapsed = baseMsRef.current + (performance.now() - anchorRef.current)
+      const next =
+        scriptSyncedToMetronomeRef.current && metronomeRunning
+          ? scriptSyncBaseElapsedMsRef.current +
+            Math.max(
+              0,
+              Math.floor((performance.now() - scriptSyncAnchorPerfMsRef.current) / 1000),
+            ) *
+              1000
+          : rawElapsed
       const deadline = scriptAutoResetAtMsRef.current
       if (deadline !== null && next >= deadline) {
         reset()
@@ -279,12 +380,33 @@ function App() {
 
     frame = requestAnimationFrame(step)
     return () => cancelAnimationFrame(frame)
-  }, [runState, reset])
+  }, [runState, reset, metronomeRunning])
+
+  useEffect(() => {
+    if (runState !== 'running') return
+    if (metronomeRunning) return
+    if (!scriptSyncedToMetronomeRef.current) return
+    // When metronome stops mid-run, continue script in realtime from current point.
+    scriptSyncedToMetronomeRef.current = false
+    baseMsRef.current = elapsedMs
+    anchorRef.current = performance.now()
+  }, [metronomeRunning, runState, elapsedMs])
 
   const start = useCallback(() => {
     if (runState === 'running') return
+    if (metronomeRunning) {
+      const metronomeActivelyTicking = !metronomeOnlyWhenScriptRunning
+      scriptSyncedToMetronomeRef.current = true
+      scriptSyncBaseElapsedMsRef.current = baseMsRef.current
+      scriptSyncAnchorPerfMsRef.current =
+        metronomeActivelyTicking
+          ? metronomeLastTickPerfMsRef.current ?? performance.now()
+          : performance.now()
+    } else {
+      scriptSyncedToMetronomeRef.current = false
+    }
     setRunState('running')
-  }, [runState])
+  }, [runState, metronomeRunning, metronomeOnlyWhenScriptRunning])
 
   const pause = useCallback(() => {
     if (runState !== 'running') return
@@ -317,6 +439,197 @@ function App() {
     </>
   )
 
+  const playMetronomeTick = useCallback(() => {
+    const AudioContextCtor = window.AudioContext
+    if (!AudioContextCtor) return
+    let context = metronomeAudioContextRef.current
+    if (!context) {
+      context = new AudioContextCtor()
+      metronomeAudioContextRef.current = context
+    }
+    if (context.state === 'suspended') {
+      void context.resume()
+    }
+    const tickBuffer = metronomeBufferRef.current
+    if (!tickBuffer) return
+    const source = context.createBufferSource()
+    source.buffer = tickBuffer
+    source.connect(context.destination)
+    source.start()
+  }, [])
+
+  useEffect(() => {
+    const AudioContextCtor = window.AudioContext
+    if (!AudioContextCtor) return
+    const context =
+      metronomeAudioContextRef.current ?? new AudioContextCtor()
+    metronomeAudioContextRef.current = context
+    let active = true
+
+    const loadBuffer = async () => {
+      try {
+        const response = await fetch(woodblockSound)
+        const arrayBuffer = await response.arrayBuffer()
+        const decoded = await context.decodeAudioData(arrayBuffer.slice(0))
+        if (!active) return
+        metronomeBufferRef.current = decoded
+      } catch {
+        metronomeBufferRef.current = null
+      }
+    }
+
+    void loadBuffer()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const metronomeScriptGateOpen =
+      !metronomeOnlyWhenScriptRunning || runState === 'running'
+    const shouldPlayMetronome = metronomeRunning && metronomeScriptGateOpen
+    const becameAudible = shouldPlayMetronome && !metronomeWasAudibleRef.current
+
+    if (!shouldPlayMetronome) {
+      if (metronomeIntervalIdRef.current !== null) {
+        window.clearInterval(metronomeIntervalIdRef.current)
+        metronomeIntervalIdRef.current = null
+      }
+      metronomeWasAudibleRef.current = false
+      return
+    }
+
+    const intervalMs = 60000 / metronomeBpm
+    if (metronomeIntervalIdRef.current !== null) {
+      window.clearInterval(metronomeIntervalIdRef.current)
+      metronomeIntervalIdRef.current = null
+    }
+    if (becameAudible) {
+      metronomeLastTickPerfMsRef.current = performance.now()
+      playMetronomeTick()
+    }
+    metronomeIntervalIdRef.current = window.setInterval(() => {
+      metronomeLastTickPerfMsRef.current = performance.now()
+      playMetronomeTick()
+    }, intervalMs)
+    metronomeWasAudibleRef.current = true
+  }, [
+    metronomeRunning,
+    metronomeBpm,
+    metronomeOnlyWhenScriptRunning,
+    metronomeOnlyWhenScriptRunning ? runState : null,
+    playMetronomeTick,
+  ])
+
+  useEffect(() => {
+    return () => {
+      if (metronomeIntervalIdRef.current !== null) {
+        window.clearInterval(metronomeIntervalIdRef.current)
+        metronomeIntervalIdRef.current = null
+      }
+      metronomeWasAudibleRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (metronomeAudioContextRef.current) {
+        void metronomeAudioContextRef.current.close()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const menuRoot = callerGroupMenuRef.current
+      if (!menuRoot) return
+      if (!menuRoot.contains(event.target as Node)) {
+        setCallerGroupMenuOpen(false)
+      }
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setCallerGroupMenuOpen(false)
+      }
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onEscape)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onEscape)
+    }
+  }, [])
+
+  const isGroupSelectionLocked = runState !== 'idle'
+  const callerScriptHeading: ReactNode = selectedGroup ? (
+    <span className="inline-flex items-center gap-2">
+      <span>Caller Script</span>
+      <span className="text-zinc-500">-</span>
+      <div ref={callerGroupMenuRef} className="relative inline-block text-left">
+        <button
+          type="button"
+          disabled={isGroupSelectionLocked}
+          onClick={() => setCallerGroupMenuOpen((open) => !open)}
+          title={
+            isGroupSelectionLocked
+              ? 'Reset the stage clock to change group'
+              : 'Select group'
+          }
+          aria-haspopup="menu"
+          aria-expanded={callerGroupMenuOpen}
+          className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-amber-300 transition hover:border-zinc-500 hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {selectedGroup.label}
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            className={`transition-transform ${callerGroupMenuOpen ? 'rotate-180' : ''}`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {callerGroupMenuOpen && !isGroupSelectionLocked ? (
+          <div
+            role="menu"
+            className="absolute right-0 z-20 mt-1 min-w-[11rem] overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-lg"
+          >
+            {groups.map((group) => {
+              const isActive = group.id === activeGroupId
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={isActive}
+                  onClick={() => {
+                    setSelectedGroupId(group.id)
+                    setCallerGroupMenuOpen(false)
+                  }}
+                  className={`block w-full px-3 py-2 text-left text-sm transition ${
+                    isActive
+                      ? 'bg-amber-500/20 text-amber-200'
+                      : 'text-zinc-200 hover:bg-zinc-800'
+                  }`}
+                >
+                  {group.label}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
+      </div>
+    </span>
+  ) : (
+    'Caller Script'
+  )
+
   return (
     <div className="flex min-h-dvh flex-col bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 px-6 py-4">
@@ -326,30 +639,39 @@ function App() {
               Whiteout Survival · State 2086
             </p>
             <h1 className="mt-1 font-display text-lg font-semibold text-zinc-100">
-              Rally time coordinator
+              Rally Tools
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-500">
-              Run the stage clock, read the caller script for the selected group, and
-              manage the roster and rally groups below.
-            </p>
           </div>
           <div className="flex shrink-0 self-end sm:self-start">
             <div className="flex items-center gap-2">
-              <label className="inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-800 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-300">
-              <input
-                type="checkbox"
-                checked={showScriptStack}
-                onChange={(e) => setShowScriptStack(e.target.checked)}
-                className="size-4 rounded border-zinc-600 bg-zinc-950 text-amber-500 focus:ring-amber-500/50"
-              />
-              Show Script
-              </label>
+              <button
+                type="button"
+                onClick={() => setShowScriptStack((prev) => !prev)}
+                className={`inline-flex cursor-pointer select-none items-center rounded-lg border px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
+                  showScriptStack
+                    ? 'border-emerald-400/70 bg-emerald-900/40 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-900/50'
+                    : 'border-zinc-600 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800'
+                }`}
+              >
+                Script {showScriptStack ? 'On' : 'Off'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetronomeModalOpen(true)}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
+                  metronomeRunning
+                    ? 'border-emerald-400/70 bg-emerald-900/40 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-900/50'
+                    : 'border-zinc-600 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800'
+                }`}
+              >
+                Metronome {metronomeRunning ? 'On' : 'Off'}
+              </button>
               <button
                 type="button"
                 onClick={clearStoredConfig}
                 className="rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-red-500/60 hover:bg-red-950/40 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
               >
-                Clear saved roster and groups
+                Clear All Settings
               </button>
             </div>
           </div>
@@ -363,9 +685,7 @@ function App() {
             targetArrivalGapSeconds={selectedGroup?.targetArrivalGapSeconds ?? 0}
             elapsedMs={elapsedMs}
             showScriptStack={showScriptStack}
-            cueHeading={
-              selectedGroup ? `Caller script · ${selectedGroup.label}` : 'Caller script'
-            }
+            cueHeading={callerScriptHeading}
             stageActions={
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -419,6 +739,20 @@ function App() {
           </div>
         </div>
       </main>
+
+      <MetronomeModal
+        isOpen={metronomeModalOpen}
+        isRunning={metronomeRunning}
+        beatsPerMinute={metronomeBpm}
+        onlyPlayWhenScriptRunning={metronomeOnlyWhenScriptRunning}
+        onClose={() => setMetronomeModalOpen(false)}
+        onStart={() => setMetronomeRunning(true)}
+        onStop={() => setMetronomeRunning(false)}
+        onChangeBeatsPerMinute={(value) =>
+          setMetronomeBpm(clampBpm(value))
+        }
+        onToggleOnlyPlayWhenScriptRunning={setMetronomeOnlyWhenScriptRunning}
+      />
     </div>
   )
 }
