@@ -228,6 +228,24 @@ function App() {
     setGroups((prev) => [...prev, createGroup(`Group ${prev.length + 1}`)])
   }, [])
 
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    setGroups((prevGroups) => {
+      if (!prevGroups.some((g) => g.id === groupId)) return prevGroups
+      const nextGroups = prevGroups.filter((g) => g.id !== groupId)
+      setSelectedGroupId((prevSelectedId) => {
+        if (prevSelectedId !== groupId) return prevSelectedId
+        return nextGroups[0]?.id ?? ''
+      })
+      return nextGroups
+    })
+    setLeads((prevLeads) =>
+      prevLeads.map((lead) => ({
+        ...lead,
+        groupIds: lead.groupIds.filter((id) => id !== groupId),
+      })),
+    )
+  }, [])
+
   const handleRenameGroup = useCallback((groupId: string, label: string) => {
     const trimmed = label.trim()
     if (!trimmed) return
@@ -724,6 +742,7 @@ function App() {
               stageClockRunning={runState !== 'idle'}
               onSelectGroup={setSelectedGroupId}
               onAddGroup={handleAddGroup}
+              onDeleteGroup={handleDeleteGroup}
               onRenameGroup={handleRenameGroup}
               onSetGroupTargetArrivalGap={handleSetGroupTargetArrivalGap}
               onSetGroupLeadMarchOverride={handleSetGroupLeadMarchOverride}

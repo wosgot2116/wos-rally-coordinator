@@ -127,6 +127,7 @@ type RallyGroupPanelProps = {
   stageClockRunning: boolean
   onSelectGroup: (groupId: string) => void
   onAddGroup: () => void
+  onDeleteGroup: (groupId: string) => void
   onRenameGroup: (groupId: string, label: string) => void
   onSetGroupTargetArrivalGap: (groupId: string, gapSeconds: number) => void
   onSetGroupLeadMarchOverride: (
@@ -146,6 +147,7 @@ export function RallyGroupPanel({
   stageClockRunning,
   onSelectGroup,
   onAddGroup,
+  onDeleteGroup,
   onRenameGroup,
   onSetGroupTargetArrivalGap,
   onSetGroupLeadMarchOverride,
@@ -166,6 +168,9 @@ export function RallyGroupPanel({
   const [editingMarchOverrideLeadId, setEditingMarchOverrideLeadId] = useState<
     string | null
   >(null)
+  const [pendingDeleteGroupId, setPendingDeleteGroupId] = useState<string | null>(
+    null,
+  )
   const dragFromIndexRef = useRef<number | null>(null)
   const touchDropIndexRef = useRef<number | null>(null)
   const cancelMarchOverrideEditLeadIdRef = useRef<string | null>(null)
@@ -263,7 +268,17 @@ export function RallyGroupPanel({
     setDragOverIndex(null)
     setMarchOverrideDraftByLeadId({})
     setEditingMarchOverrideLeadId(null)
+    setPendingDeleteGroupId(null)
   }, [panelLocked])
+
+  useEffect(() => {
+    if (
+      pendingDeleteGroupId &&
+      !groups.some((group) => group.id === pendingDeleteGroupId)
+    ) {
+      setPendingDeleteGroupId(null)
+    }
+  }, [groups, pendingDeleteGroupId])
 
   const commitRename = useCallback(() => {
     if (!editingGroupId) return
@@ -305,6 +320,7 @@ export function RallyGroupPanel({
         {groups.map((g) => {
           const selected = g.id === selectedGroupId
           const editing = editingTargetId === g.id
+          const pendingDelete = pendingDeleteGroupId === g.id
 
           if (editing) {
             return (
@@ -368,39 +384,112 @@ export function RallyGroupPanel({
               >
                 {g.label}
               </button>
-              <button
-                type="button"
-                disabled={panelLocked}
-                onClick={(e) => {
-                  e.preventDefault()
-                  startRename(g)
-                }}
-                aria-label={`Rename ${g.label}`}
-                title={
-                  panelLocked
-                    ? 'Reset the stage clock to rename'
-                    : 'Rename group'
-                }
-                className={`border-l px-2 transition focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60 ${
-                  selected
-                    ? 'border-amber-600/40 bg-amber-500 text-zinc-950 hover:bg-amber-400'
-                    : 'border-zinc-700 bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                }`}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                </svg>
-              </button>
+              {selected ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={panelLocked}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      startRename(g)
+                    }}
+                    aria-label={`Rename ${g.label}`}
+                    title={
+                      panelLocked
+                        ? 'Reset the stage clock to rename'
+                        : 'Rename group'
+                    }
+                    className="border-l border-amber-600/40 bg-amber-500 px-2 text-zinc-950 transition hover:bg-amber-400 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                  {pendingDelete ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={panelLocked}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setPendingDeleteGroupId(null)
+                          onDeleteGroup(g.id)
+                        }}
+                        aria-label={`Confirm delete ${g.label}`}
+                        title={
+                          panelLocked
+                            ? 'Reset the stage clock to delete'
+                            : 'Confirm delete'
+                        }
+                        className="border-l border-red-400/50 bg-red-500/35 px-2 text-red-50 transition hover:bg-red-500/45 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide">
+                          Confirm
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={panelLocked}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setPendingDeleteGroupId(null)
+                        }}
+                        aria-label={`Cancel delete ${g.label}`}
+                        title={
+                          panelLocked
+                            ? 'Reset the stage clock to edit'
+                            : 'Cancel delete'
+                        }
+                        className="border-l border-zinc-700 bg-zinc-950 px-2 text-zinc-300 transition hover:bg-zinc-800 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide">
+                          Cancel
+                        </span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={panelLocked}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPendingDeleteGroupId(g.id)
+                      }}
+                      aria-label={`Delete ${g.label}`}
+                      title={
+                        panelLocked
+                          ? 'Reset the stage clock to delete'
+                          : 'Delete group'
+                      }
+                      className="border-l border-amber-600/40 bg-amber-500 px-2 text-zinc-950 transition hover:bg-amber-400 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="m18 6-12 12M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              ) : null}
             </div>
           )
         })}
