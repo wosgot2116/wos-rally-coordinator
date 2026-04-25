@@ -381,11 +381,7 @@ function App() {
       const next =
         scriptSyncedToMetronomeRef.current && metronomeRunning
           ? scriptSyncBaseElapsedMsRef.current +
-            Math.max(
-              0,
-              Math.floor((performance.now() - scriptSyncAnchorPerfMsRef.current) / 1000),
-            ) *
-              1000
+            Math.max(0, performance.now() - scriptSyncAnchorPerfMsRef.current)
           : rawElapsed
       const deadline = scriptAutoResetAtMsRef.current
       if (deadline !== null && next >= deadline) {
