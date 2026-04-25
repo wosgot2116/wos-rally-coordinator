@@ -81,7 +81,7 @@ export function StageClock({
             >
               {stageActions}
               <div
-                className={`mt-4 break-words font-display font-bold leading-[0.95] tracking-tight text-white ${
+                className={`mt-4 flex items-center justify-center break-words font-display font-bold leading-[0.95] tracking-tight text-white ${
                   showScriptStack
                     ? 'min-h-[6.5rem] text-5xl sm:min-h-[7rem] sm:text-6xl md:min-h-[8rem] md:text-7xl lg:min-h-[9rem] lg:text-8xl xl:text-[7rem] 2xl:text-[8rem]'
                     : 'min-h-[7.5rem] text-6xl sm:min-h-[9rem] sm:text-7xl md:min-h-[10rem] md:text-8xl lg:min-h-[11rem] lg:text-9xl xl:min-h-[12rem] xl:text-[8.5rem] 2xl:text-[10rem]'
