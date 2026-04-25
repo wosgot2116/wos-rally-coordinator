@@ -168,6 +168,9 @@ export function RallyGroupPanel({
   const [editingMarchOverrideLeadId, setEditingMarchOverrideLeadId] = useState<
     string | null
   >(null)
+  const [showHelp, setShowHelp] = useState(false)
+  const [showTargetArrivalGapHelp, setShowTargetArrivalGapHelp] =
+    useState(false)
   const [pendingDeleteGroupId, setPendingDeleteGroupId] = useState<string | null>(
     null,
   )
@@ -303,17 +306,30 @@ export function RallyGroupPanel({
       aria-labelledby="rally-groups-heading"
     >
       <div className="border-b border-zinc-800 px-4 py-3 sm:px-5">
-        <h2
-          id="rally-groups-heading"
-          className="text-base font-semibold text-zinc-100"
-        >
-          Rally groups
-        </h2>
-        <p className="mt-0.5 text-sm text-zinc-500">
-          Pick a tab, drag leads from the roster into the drop area,
-          then use the dot grip to reorder members. Rename with the pencil or
-          double-click a tab. Group controls lock while the stage clock is active.
-        </p>
+        <div className="flex items-center gap-2">
+          <h2
+            id="rally-groups-heading"
+            className="text-base font-semibold text-zinc-100"
+          >
+            Rally groups
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowHelp((prev) => !prev)}
+            aria-label={showHelp ? 'Hide rally groups help' : 'Show rally groups help'}
+            title={showHelp ? 'Hide help text' : 'Show help text'}
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 text-[11px] font-semibold text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+          >
+            ?
+          </button>
+        </div>
+        {showHelp ? (
+          <p className="mt-0.5 text-sm text-zinc-500">
+            Pick a tab, drag leads from the roster into the drop area, then use the
+            dot grip to reorder members. Rename with the pencil or double-click a
+            tab. Group controls lock while the stage clock is active.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2 sm:px-5">
@@ -512,16 +528,39 @@ export function RallyGroupPanel({
         <div className="border-b border-zinc-800 bg-zinc-900/35 px-4 py-3 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <label
-                htmlFor={`target-arrival-gap-${selectedGroup.id}`}
-                className="text-sm font-medium text-zinc-200"
-              >
-                Target arrival gap
-              </label>
-              <p className="mt-0.5 max-w-xl text-xs leading-snug text-zinc-500">
-                Seconds between target arrivals in list order. 0 means same
-                arrival time; default is 0.
-              </p>
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor={`target-arrival-gap-${selectedGroup.id}`}
+                  className="text-sm font-medium text-zinc-200"
+                >
+                  Target arrival gap
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowTargetArrivalGapHelp((prev) => !prev)
+                  }
+                  aria-label={
+                    showTargetArrivalGapHelp
+                      ? 'Hide target arrival gap help'
+                      : 'Show target arrival gap help'
+                  }
+                  title={
+                    showTargetArrivalGapHelp
+                      ? 'Hide help text'
+                      : 'Show help text'
+                  }
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 text-[11px] font-semibold text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                >
+                  ?
+                </button>
+              </div>
+              {showTargetArrivalGapHelp ? (
+                <p className="mt-0.5 max-w-xl text-xs leading-snug text-zinc-500">
+                  Seconds between target arrivals in list order. 0 means same
+                  arrival time; default is 0.
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <input

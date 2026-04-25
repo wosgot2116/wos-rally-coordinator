@@ -58,6 +58,7 @@ export function RallyLeadList({
   onAddLead,
 }: RallyLeadListProps) {
   const [timeDraftById, setTimeDraftById] = useState<Record<string, string>>({})
+  const [showHelp, setShowHelp] = useState(false)
   const rosterLocked = stageClockRunning
 
   const timeDisplayValue = (row: RallyLeadEntry) =>
@@ -68,19 +69,31 @@ export function RallyLeadList({
       className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/40 shadow-sm"
       aria-labelledby="rally-roster-heading"
     >
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800 px-4 py-3 sm:px-5">
-        <div>
-          <h2
-            id="rally-roster-heading"
-            className="text-base font-semibold text-zinc-100"
-          >
-            Roster
-          </h2>
-          <p className="mt-0.5 text-sm text-zinc-500">
-            Edit names and march times for any row. Drag leads into a group on
-            desktop, or use the Add-to-group dropdown on mobile. Player, march
-            time, Add lead, and Remove are locked while the stage clock is active.
-          </p>
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 sm:px-5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h2
+              id="rally-roster-heading"
+              className="text-base font-semibold text-zinc-100"
+            >
+              Roster
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowHelp((prev) => !prev)}
+              aria-label={showHelp ? 'Hide roster help' : 'Show roster help'}
+              title={showHelp ? 'Hide help text' : 'Show help text'}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-700 text-[11px] font-semibold text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+            >
+              ?
+            </button>
+          </div>
+          {showHelp ? (
+            <p className="mt-0.5 text-sm text-zinc-500">
+              Edit names and march times. Drag leads into groups on desktop, or use
+              Add to on mobile. Roster actions lock while the stage clock is active.
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
