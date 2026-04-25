@@ -12,6 +12,11 @@ export type RallyGroup = {
    * Roster order is the `leads` array; this list does not reorder the roster.
    */
   memberOrderIds: string[]
+  /**
+   * Optional march-time overrides (seconds) for members in this specific group.
+   * Missing key means "use roster march time".
+   */
+  marchTimeOverrideSecondsByLeadId: Record<string, number>
 }
 
 export type RallyLeadEntry = {
@@ -41,5 +46,6 @@ export function createGroup(label: string): RallyGroup {
     label,
     targetArrivalGapSeconds: 0,
     memberOrderIds: [],
+    marchTimeOverrideSecondsByLeadId: {},
   }
 }

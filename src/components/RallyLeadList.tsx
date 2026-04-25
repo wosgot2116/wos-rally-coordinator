@@ -34,13 +34,6 @@ function AssignToGroupDragHandle({ leadId }: { leadId: string }) {
 
 export type { RallyLeadEntry } from '../rally/rallyTypes'
 
-function groupLabels(groups: RallyGroup[], groupIds: string[]): string[] {
-  if (groupIds.length === 0) return []
-  return groupIds.map((groupId) => {
-    return groups.find((g) => g.id === groupId)?.label ?? 'Unknown group'
-  })
-}
-
 export type RallyLeadListProps = {
   rows: RallyLeadEntry[]
   groups: RallyGroup[]
@@ -112,9 +105,6 @@ export function RallyLeadList({
                 Player
               </th>
               <th scope="col" className="px-4 py-2.5 sm:px-5">
-                Group
-              </th>
-              <th scope="col" className="px-4 py-2.5 sm:px-5">
                 March Time
               </th>
               <th scope="col" className="w-px px-2 py-2.5 sm:px-3">
@@ -129,7 +119,7 @@ export function RallyLeadList({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={4}
                   className="px-4 py-8 text-center text-zinc-500 sm:px-5"
                 >
                   No leads in the roster. Use &ldquo;Add lead&rdquo; to start,
@@ -138,16 +128,11 @@ export function RallyLeadList({
               </tr>
             ) : (
               rows.map((row) => {
-                const labels = groupLabels(groups, row.groupIds)
-                const assigned = labels.length > 0
                 const fieldClass =
                   'rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900/80 disabled:text-zinc-500 disabled:opacity-80'
 
                 return (
-                  <tr
-                    key={row.id}
-                    className={`align-middle ${assigned ? 'bg-zinc-900/50' : ''}`}
-                  >
+                  <tr key={row.id} className="align-middle">
                     <td className="px-4 py-2 sm:px-5">
                       <label className="sr-only" htmlFor={`name-${row.id}`}>
                         Player name
@@ -167,17 +152,8 @@ export function RallyLeadList({
                             ? 'Reset the stage clock to edit'
                             : undefined
                         }
-                        className={`w-full min-w-[8rem] ${fieldClass}`}
+                        className={`w-full min-w-[4rem] ${fieldClass}`}
                       />
-                    </td>
-                    <td className="px-4 py-2 sm:px-5">
-                      {assigned ? (
-                        <span className="inline-flex max-w-full items-center rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200/95">
-                          <span className="truncate">{labels.join(', ')}</span>
-                        </span>
-                      ) : (
-                        <span className="text-zinc-600">—</span>
-                      )}
                     </td>
                     <td className="px-4 py-2 sm:px-5">
                       <label className="sr-only" htmlFor={`time-${row.id}`}>

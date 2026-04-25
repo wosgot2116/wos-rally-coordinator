@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DND_LEAD_ID_MIME, DND_REORDER_INDEX_MIME } from '../rally/dndMimes'
-import { formatSecondsAsMmSs } from '../rally/timeMmSs'
+import { formatSecondsAsMmSs, parseMmSsToSeconds } from '../rally/timeMmSs'
 import type { RallyGroup, RallyLeadEntry } from '../rally/rallyTypes'
 
 const UUID_RE =
@@ -129,6 +129,11 @@ type RallyGroupPanelProps = {
   onAddGroup: () => void
   onRenameGroup: (groupId: string, label: string) => void
   onSetGroupTargetArrivalGap: (groupId: string, gapSeconds: number) => void
+  onSetGroupLeadMarchOverride: (
+    groupId: string,
+    leadId: string,
+    marchTimeSeconds: number | null,
+  ) => void
   members: RallyLeadEntry[]
   onAssignLead: (leadId: string, groupId: string) => void
   onReturnToSource: (leadId: string) => void
@@ -143,6 +148,7 @@ export function RallyGroupPanel({
   onAddGroup,
   onRenameGroup,
   onSetGroupTargetArrivalGap,
+  onSetGroupLeadMarchOverride,
   members,
   onAssignLead,
   onReturnToSource,
@@ -154,8 +160,15 @@ export function RallyGroupPanel({
   const [renameDraft, setRenameDraft] = useState('')
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [marchOverrideDraftByLeadId, setMarchOverrideDraftByLeadId] = useState<
+    Record<string, string>
+  >({})
+  const [editingMarchOverrideLeadId, setEditingMarchOverrideLeadId] = useState<
+    string | null
+  >(null)
   const dragFromIndexRef = useRef<number | null>(null)
   const touchDropIndexRef = useRef<number | null>(null)
+  const cancelMarchOverrideEditLeadIdRef = useRef<string | null>(null)
 
   const endHighlight = useCallback(() => {
     setDropActive(false)
@@ -248,6 +261,8 @@ export function RallyGroupPanel({
     touchDropIndexRef.current = null
     setDragFromIndex(null)
     setDragOverIndex(null)
+    setMarchOverrideDraftByLeadId({})
+    setEditingMarchOverrideLeadId(null)
   }, [panelLocked])
 
   const commitRename = useCallback(() => {
@@ -516,99 +531,296 @@ export function RallyGroupPanel({
               No leads in this group yet.
             </p>
           ) : (
-            <ul className="mt-4 divide-y divide-zinc-800 rounded-lg border border-zinc-800 bg-zinc-900/60">
-              {members.map((m, index) => (
-                <li
-                  key={m.id}
-                  data-member-row-index={index}
-                  className={`flex flex-wrap items-center gap-2 px-2 py-2 transition-colors sm:px-3 ${
-                    dragFromIndex === index ? 'opacity-40' : ''
-                  } ${
-                    dragOverIndex === index &&
-                    dragFromIndex !== null &&
-                    dragFromIndex !== index
-                      ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/35'
-                      : ''
-                  }`}
-                  onDragOver={(e) => {
-                    if (panelLocked) return
-                    if (hasLeadPayload(e.dataTransfer)) {
+            <div className="mt-4 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/60">
+              <div className="flex items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900/80 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 sm:px-3">
+                <span>Lead</span>
+                <span>March Time / Actions</span>
+              </div>
+              <ul className="divide-y divide-zinc-800">
+                {members.map((m, index) => (
+                  <li
+                    key={m.id}
+                    data-member-row-index={index}
+                    className={`flex flex-wrap items-center gap-2 px-2 py-2 transition-colors sm:px-3 ${
+                      dragFromIndex === index ? 'opacity-40' : ''
+                    } ${
+                      dragOverIndex === index &&
+                      dragFromIndex !== null &&
+                      dragFromIndex !== index
+                        ? 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/35'
+                        : ''
+                    }`}
+                    onDragOver={(e) => {
+                      if (panelLocked) return
+                      if (hasLeadPayload(e.dataTransfer)) {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                        setDropActive(true)
+                        return
+                      }
+                      if (!e.dataTransfer.types.includes(DND_REORDER_INDEX_MIME)) {
+                        return
+                      }
                       e.preventDefault()
                       e.dataTransfer.dropEffect = 'move'
-                      setDropActive(true)
-                      return
-                    }
-                    if (!e.dataTransfer.types.includes(DND_REORDER_INDEX_MIME)) {
-                      return
-                    }
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                    if (dragFromIndexRef.current !== null) {
-                      setDragOverIndex(index)
-                    }
-                  }}
-                  onDragLeave={(e) => {
-                    if (panelLocked) return
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return
-                    setDragOverIndex((cur) => (cur === index ? null : cur))
-                  }}
-                  onDrop={(e) => {
-                    if (panelLocked) return
-                    if (hasLeadPayload(e.dataTransfer)) {
+                      if (dragFromIndexRef.current !== null) {
+                        setDragOverIndex(index)
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (panelLocked) return
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return
+                      setDragOverIndex((cur) => (cur === index ? null : cur))
+                    }}
+                    onDrop={(e) => {
+                      if (panelLocked) return
+                      if (hasLeadPayload(e.dataTransfer)) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        endHighlight()
+                        let id = e.dataTransfer.getData(DND_LEAD_ID_MIME)
+                        if (!id) {
+                          const plain = e.dataTransfer.getData('text/plain').trim()
+                          if (UUID_RE.test(plain)) id = plain
+                        }
+                        if (id) {
+                          onAssignLead(id, selectedGroupId)
+                        }
+                        return
+                      }
                       e.preventDefault()
                       e.stopPropagation()
-                      endHighlight()
-                      let id = e.dataTransfer.getData(DND_LEAD_ID_MIME)
-                      if (!id) {
-                        const plain = e.dataTransfer.getData('text/plain').trim()
-                        if (UUID_RE.test(plain)) id = plain
+                      const fromStr = e.dataTransfer.getData(DND_REORDER_INDEX_MIME)
+                      if (fromStr === '') {
+                        endMemberDrag()
+                        return
                       }
-                      if (id) {
-                        onAssignLead(id, selectedGroupId)
+                      const from = Number.parseInt(fromStr, 10)
+                      if (
+                        !Number.isFinite(from) ||
+                        from < 0 ||
+                        from >= members.length
+                      ) {
+                        endMemberDrag()
+                        return
                       }
-                      return
-                    }
-                    e.preventDefault()
-                    e.stopPropagation()
-                    const fromStr = e.dataTransfer.getData(DND_REORDER_INDEX_MIME)
-                    if (fromStr === '') {
+                      onReorderMembers(from, index)
                       endMemberDrag()
-                      return
-                    }
-                    const from = Number.parseInt(fromStr, 10)
-                    if (
-                      !Number.isFinite(from) ||
-                      from < 0 ||
-                      from >= members.length
-                    ) {
-                      endMemberDrag()
-                      return
-                    }
-                    onReorderMembers(from, index)
-                    endMemberDrag()
-                  }}
-                >
-                  <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <MemberReorderDragHandle
-                        rowIndex={index}
-                        disabled={panelLocked}
-                        onDragStart={() => {
-                          dragFromIndexRef.current = index
-                          setDragFromIndex(index)
-                        }}
-                        onDragEnd={endMemberDrag}
-                        onTouchPosition={updateTouchDropHighlight}
-                        onTouchFinish={finishTouchReorder}
-                      />
-                      <span className="min-w-0 truncate font-medium text-zinc-200">
-                        {m.name.trim() || '—'}
-                      </span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="font-mono text-sm tabular-nums text-zinc-400">
-                        {formatSecondsAsMmSs(m.marchTimeSeconds)}
-                      </span>
+                    }}
+                  >
+                    <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <MemberReorderDragHandle
+                          rowIndex={index}
+                          disabled={panelLocked}
+                          onDragStart={() => {
+                            dragFromIndexRef.current = index
+                            setDragFromIndex(index)
+                          }}
+                          onDragEnd={endMemberDrag}
+                          onTouchPosition={updateTouchDropHighlight}
+                          onTouchFinish={finishTouchReorder}
+                        />
+                        <span className="min-w-0 truncate font-medium text-zinc-200">
+                          {m.name.trim() || '—'}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                      {selectedGroup ? (
+                        <>
+                          {editingMarchOverrideLeadId === m.id ? (
+                            <>
+                              <span className="inline-flex items-center rounded-md border border-amber-400/60 bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                                Override
+                              </span>
+                              <label
+                                className="sr-only"
+                                htmlFor={`group-march-time-${selectedGroup.id}-${m.id}`}
+                              >
+                                Group march time override
+                              </label>
+                              <input
+                                id={`group-march-time-${selectedGroup.id}-${m.id}`}
+                                type="text"
+                                inputMode="numeric"
+                                autoFocus
+                                value={
+                                  marchOverrideDraftByLeadId[m.id] ??
+                                  (selectedGroup.marchTimeOverrideSecondsByLeadId[m.id] !==
+                                  undefined
+                                    ? formatSecondsAsMmSs(
+                                        selectedGroup.marchTimeOverrideSecondsByLeadId[m.id]!,
+                                      )
+                                    : '')
+                                }
+                                onChange={(e) => {
+                                  setMarchOverrideDraftByLeadId((cur) => ({
+                                    ...cur,
+                                    [m.id]: e.target.value,
+                                  }))
+                                }}
+                                onBlur={(e) => {
+                                  setEditingMarchOverrideLeadId((cur) =>
+                                    cur === m.id ? null : cur,
+                                  )
+                                  if (cancelMarchOverrideEditLeadIdRef.current === m.id) {
+                                    cancelMarchOverrideEditLeadIdRef.current = null
+                                    return
+                                  }
+                                  const raw = e.target.value.trim()
+                                  setMarchOverrideDraftByLeadId((cur) => {
+                                    const next = { ...cur }
+                                    delete next[m.id]
+                                    return next
+                                  })
+                                  if (!selectedGroup) return
+                                  if (raw === '') {
+                                    onSetGroupLeadMarchOverride(
+                                      selectedGroup.id,
+                                      m.id,
+                                      null,
+                                    )
+                                    return
+                                  }
+                                  const parsed = parseMmSsToSeconds(raw)
+                                  if (parsed !== null) {
+                                    onSetGroupLeadMarchOverride(
+                                      selectedGroup.id,
+                                      m.id,
+                                      parsed,
+                                    )
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    ;(e.target as HTMLInputElement).blur()
+                                  }
+                                  if (e.key === 'Escape') {
+                                    cancelMarchOverrideEditLeadIdRef.current = m.id
+                                    setMarchOverrideDraftByLeadId((cur) => {
+                                      const next = { ...cur }
+                                      delete next[m.id]
+                                      return next
+                                    })
+                                    ;(e.target as HTMLInputElement).blur()
+                                  }
+                                }}
+                                disabled={panelLocked}
+                                placeholder={formatSecondsAsMmSs(m.marchTimeSeconds)}
+                                title={
+                                  panelLocked
+                                    ? 'Reset the stage clock to edit'
+                                    : 'Override this lead for only this group (mm:ss)'
+                                }
+                                className="w-20 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 font-mono text-xs tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-60"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              {selectedGroup.marchTimeOverrideSecondsByLeadId[m.id] !==
+                              undefined ? (
+                                <span className="inline-flex items-center rounded-md border border-amber-400/60 bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                                  Override
+                                </span>
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={panelLocked}
+                                onClick={() => {
+                                  setEditingMarchOverrideLeadId(m.id)
+                                  setMarchOverrideDraftByLeadId((cur) => ({
+                                    ...cur,
+                                    [m.id]:
+                                      selectedGroup.marchTimeOverrideSecondsByLeadId[m.id] !==
+                                      undefined
+                                        ? formatSecondsAsMmSs(
+                                            selectedGroup
+                                              .marchTimeOverrideSecondsByLeadId[m.id]!,
+                                          )
+                                        : '',
+                                  }))
+                                }}
+                                title={
+                                  panelLocked
+                                    ? 'Reset the stage clock to edit'
+                                    : 'Override this lead for only this group'
+                                }
+                                aria-label={`Edit ${m.name.trim() || 'lead'} march time override`}
+                                className="rounded-md border border-zinc-700 p-1 text-zinc-400 transition hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden
+                                >
+                                  <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                </svg>
+                              </button>
+                              {selectedGroup.marchTimeOverrideSecondsByLeadId[m.id] !==
+                              undefined ? (
+                                <button
+                                  type="button"
+                                  disabled={panelLocked}
+                                  onClick={() => {
+                                    setMarchOverrideDraftByLeadId((cur) => {
+                                      const next = { ...cur }
+                                      delete next[m.id]
+                                      return next
+                                    })
+                                    onSetGroupLeadMarchOverride(
+                                      selectedGroup.id,
+                                      m.id,
+                                      null,
+                                    )
+                                  }}
+                                  title={
+                                    panelLocked
+                                      ? 'Reset the stage clock to clear override'
+                                      : 'Clear march time override'
+                                  }
+                                  aria-label={`Clear ${m.name.trim() || 'lead'} march time override`}
+                                  className="rounded-md border border-zinc-700 p-1 text-zinc-400 transition hover:border-red-900/80 hover:bg-red-950/40 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden
+                                  >
+                                    <path d="m18 6-12 12M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              ) : null}
+                            </>
+                          )}
+                          {selectedGroup.marchTimeOverrideSecondsByLeadId[m.id] !==
+                          undefined &&
+                          editingMarchOverrideLeadId !== m.id ? (
+                            <span className="font-mono text-sm tabular-nums text-amber-200">
+                              {formatSecondsAsMmSs(
+                                selectedGroup.marchTimeOverrideSecondsByLeadId[m.id]!,
+                              )}
+                            </span>
+                          ) : null}
+                          {selectedGroup.marchTimeOverrideSecondsByLeadId[m.id] ===
+                          undefined ? (
+                            <span className="font-mono text-sm tabular-nums text-zinc-400">
+                              {formatSecondsAsMmSs(m.marchTimeSeconds)}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : null}
                       <button
                         type="button"
                         disabled={panelLocked}
@@ -622,11 +834,12 @@ export function RallyGroupPanel({
                       >
                         Remove
                       </button>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       </div>

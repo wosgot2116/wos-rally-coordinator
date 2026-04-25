@@ -60,14 +60,24 @@ function App() {
     )
   }, [leads, activeGroupId, selectedGroup])
 
+  const groupMembersForScript = useMemo(() => {
+    if (!selectedGroup) return []
+    return groupMembers.map((lead) => {
+      const override =
+        selectedGroup.marchTimeOverrideSecondsByLeadId[lead.id]
+      if (override === undefined) return lead
+      return { ...lead, marchTimeSeconds: override }
+    })
+  }, [groupMembers, selectedGroup])
+
   const lastScriptSecondIndex = useMemo(() => {
     if (!selectedGroup || groupMembers.length === 0) return -1
     const rows = computeDepartureRows(
-      groupMembers,
+      groupMembersForScript,
       selectedGroup.targetArrivalGapSeconds,
     )
     return lastScriptSecond(buildScriptEvents(rows))
-  }, [selectedGroup, groupMembers])
+  }, [selectedGroup, groupMembersForScript])
 
   const handleReorderGroupMembers = useCallback(
     (groupId: string, from: number, to: number) => {
@@ -105,6 +115,11 @@ function App() {
       prev.map((g) => ({
         ...g,
         memberOrderIds: g.memberOrderIds.filter((mid) => mid !== id),
+        marchTimeOverrideSecondsByLeadId: Object.fromEntries(
+          Object.entries(g.marchTimeOverrideSecondsByLeadId).filter(
+            ([leadId]) => leadId !== id,
+          ),
+        ),
       })),
     )
   }, [])
@@ -144,6 +159,11 @@ function App() {
           ? {
               ...g,
               memberOrderIds: g.memberOrderIds.filter((id) => id !== leadId),
+              marchTimeOverrideSecondsByLeadId: Object.fromEntries(
+                Object.entries(g.marchTimeOverrideSecondsByLeadId).filter(
+                  ([id]) => id !== leadId,
+                ),
+              ),
             }
           : g,
       ),
@@ -177,8 +197,32 @@ function App() {
     [],
   )
 
+  const handleSetGroupLeadMarchOverride = useCallback(
+    (groupId: string, leadId: string, marchTimeSeconds: number | null) => {
+      setGroups((prev) =>
+        prev.map((g) => {
+          if (g.id !== groupId) return g
+          const nextOverrides = { ...g.marchTimeOverrideSecondsByLeadId }
+          if (marchTimeSeconds === null) {
+            delete nextOverrides[leadId]
+          } else {
+            nextOverrides[leadId] = Math.max(
+              0,
+              Math.floor(
+                Number.isFinite(marchTimeSeconds) ? marchTimeSeconds : 0,
+              ),
+            )
+          }
+          return { ...g, marchTimeOverrideSecondsByLeadId: nextOverrides }
+        }),
+      )
+    },
+    [],
+  )
+
   const [runState, setRunState] = useState<RunState>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [showScriptStack, setShowScriptStack] = useState(false)
   const baseMsRef = useRef(0)
   const anchorRef = useRef(0)
   /** Elapsed ms at which to auto-reset: 3s after the last script second ends. */
@@ -289,47 +333,56 @@ function App() {
               manage the roster and rally groups below.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={clearStoredConfig}
-            className="shrink-0 self-end rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-red-500/60 hover:bg-red-950/40 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 sm:self-start"
-          >
-            Clear saved roster and groups
-          </button>
+          <div className="flex shrink-0 self-end sm:self-start">
+            <div className="flex items-center gap-2">
+              <label className="inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-800 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-300">
+              <input
+                type="checkbox"
+                checked={showScriptStack}
+                onChange={(e) => setShowScriptStack(e.target.checked)}
+                className="size-4 rounded border-zinc-600 bg-zinc-950 text-amber-500 focus:ring-amber-500/50"
+              />
+              Show Script
+              </label>
+              <button
+                type="button"
+                onClick={clearStoredConfig}
+                className="rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:border-red-500/60 hover:bg-red-950/40 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+              >
+                Clear saved roster and groups
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-12 px-6 py-8">
-        <div className="flex w-full flex-col items-center border-b border-zinc-800/80 pb-12 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-            Stage clock
-          </p>
-          <div
-            className="mt-2 font-mono text-xl font-medium tabular-nums tracking-tight text-zinc-500 sm:text-2xl"
-            aria-live="polite"
-          >
-            {formatElapsed(elapsedMs)}
-          </div>
-
-          {selectedGroup ? (
-            <>
-              <p className="mt-8 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-                Caller script · {selectedGroup.label}
-              </p>
-              <StageClock
-                members={groupMembers}
-                targetArrivalGapSeconds={selectedGroup.targetArrivalGapSeconds}
-                elapsedMs={elapsedMs}
-                stageActions={
-                  <div className="flex flex-wrap justify-center gap-4">
-                    {stageButtons}
-                  </div>
-                }
-              />
-            </>
-          ) : (
-            <div className="mt-8 flex flex-wrap justify-center gap-4">{stageButtons}</div>
-          )}
+        <div className="w-full border-b border-zinc-800/80 pb-12">
+          <StageClock
+            members={groupMembersForScript}
+            targetArrivalGapSeconds={selectedGroup?.targetArrivalGapSeconds ?? 0}
+            elapsedMs={elapsedMs}
+            showScriptStack={showScriptStack}
+            cueHeading={
+              selectedGroup ? `Caller script · ${selectedGroup.label}` : 'Caller script'
+            }
+            stageActions={
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                  Stage clock
+                </p>
+                <div
+                  className="mt-2 font-mono text-xl font-medium tabular-nums tracking-tight text-zinc-500 sm:text-2xl"
+                  aria-live="polite"
+                >
+                  {formatElapsed(elapsedMs)}
+                </div>
+                <div className="mt-8 flex flex-wrap justify-center gap-4">
+                  {stageButtons}
+                </div>
+              </div>
+            }
+          />
         </div>
 
         <div className="flex min-w-0 w-full flex-1 flex-col gap-6 md:flex-row md:items-start md:gap-6">
@@ -353,6 +406,7 @@ function App() {
               onAddGroup={handleAddGroup}
               onRenameGroup={handleRenameGroup}
               onSetGroupTargetArrivalGap={handleSetGroupTargetArrivalGap}
+              onSetGroupLeadMarchOverride={handleSetGroupLeadMarchOverride}
               members={groupMembers}
               onAssignLead={handleAssignLead}
               onReturnToSource={(leadId) =>

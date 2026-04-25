@@ -25,11 +25,23 @@ function normalizeGroup(raw: Record<string, unknown>): RallyGroup | null {
   const memberOrderIds = Array.isArray(orderRaw)
     ? orderRaw.filter((id): id is string => typeof id === 'string')
     : []
+  const overridesRaw = raw.marchTimeOverrideSecondsByLeadId
+  const marchTimeOverrideSecondsByLeadId = isRecord(overridesRaw)
+    ? Object.fromEntries(
+        Object.entries(overridesRaw)
+          .filter((entry): entry is [string, number] => {
+            const [, value] = entry
+            return typeof value === 'number' && Number.isFinite(value)
+          })
+          .map(([leadId, seconds]) => [leadId, Math.max(0, Math.floor(seconds))]),
+      )
+    : {}
   return {
     id: raw.id,
     label: raw.label,
     targetArrivalGapSeconds: Math.max(0, Math.floor(Number.isFinite(gap) ? gap : 0)),
     memberOrderIds,
+    marchTimeOverrideSecondsByLeadId,
   }
 }
 
