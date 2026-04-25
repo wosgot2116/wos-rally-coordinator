@@ -23,12 +23,14 @@ import {
 } from './rally/rallyTypes'
 
 type RunState = 'idle' | 'running' | 'paused'
+type DisplayMode = 'caller-script' | 'manual-starts'
 const MIN_BPM = 30
 const MAX_BPM = 300
 const UI_SETTINGS_STORAGE_KEY = 'wos-rally-timer:ui-settings:v1'
 
 type PersistedUiSettings = {
-  showScriptStack: boolean
+  displayMode: DisplayMode
+  manualStartTime: string
   metronomeRunning: boolean
   metronomeBpm: number
   metronomeOnlyWhenScriptRunning: boolean
@@ -43,7 +45,8 @@ function loadUiSettings(): PersistedUiSettings | null {
     if (!parsed || typeof parsed !== 'object') return null
     const data = parsed as Record<string, unknown>
     if (
-      typeof data.showScriptStack !== 'boolean' ||
+      (data.displayMode !== 'caller-script' && data.displayMode !== 'manual-starts') ||
+      typeof data.manualStartTime !== 'string' ||
       typeof data.metronomeRunning !== 'boolean' ||
       typeof data.metronomeBpm !== 'number' ||
       typeof data.metronomeOnlyWhenScriptRunning !== 'boolean'
@@ -51,7 +54,8 @@ function loadUiSettings(): PersistedUiSettings | null {
       return null
     }
     return {
-      showScriptStack: data.showScriptStack,
+      displayMode: data.displayMode,
+      manualStartTime: normalizeManualStartTime(data.manualStartTime),
       metronomeRunning: data.metronomeRunning,
       metronomeBpm: clampBpm(data.metronomeBpm),
       metronomeOnlyWhenScriptRunning: data.metronomeOnlyWhenScriptRunning,
@@ -68,6 +72,21 @@ function writeUiSettings(settings: PersistedUiSettings): void {
   } catch {
     /* ignore storage failures */
   }
+}
+
+function normalizeManualStartTime(value: string): string {
+  const rawParts = value.split(':')
+  const padded =
+    rawParts.length === 2 ? [...rawParts, '00'] : rawParts
+  const parts = padded.map((part) => Number.parseInt(part, 10))
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+    return '00:00:00'
+  }
+  const [hours, minutes, seconds] = parts
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+    return '00:00:00'
+  }
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 function clampBpm(value: number): number {
@@ -294,8 +313,11 @@ function App() {
 
   const [runState, setRunState] = useState<RunState>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
-  const [showScriptStack, setShowScriptStack] = useState(
-    () => uiBootstrap?.showScriptStack ?? false,
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(
+    () => uiBootstrap?.displayMode ?? 'caller-script',
+  )
+  const [manualStartTime, setManualStartTime] = useState(
+    () => uiBootstrap?.manualStartTime ?? '00:00:00',
   )
   const [metronomeModalOpen, setMetronomeModalOpen] = useState(false)
   const [metronomeRunning, setMetronomeRunning] = useState(
@@ -350,13 +372,15 @@ function App() {
 
   useEffect(() => {
     writeUiSettings({
-      showScriptStack,
+      displayMode,
+      manualStartTime,
       metronomeRunning,
       metronomeBpm,
       metronomeOnlyWhenScriptRunning,
     })
   }, [
-    showScriptStack,
+    displayMode,
+    manualStartTime,
     metronomeRunning,
     metronomeBpm,
     metronomeOnlyWhenScriptRunning,
@@ -432,6 +456,18 @@ function App() {
 
   const primaryAction = runState === 'running' ? pause : start
   const primaryLabel = runState === 'running' ? 'Pause' : 'Start'
+  const handleChangeDisplayMode = useCallback(
+    (mode: DisplayMode) => {
+      setDisplayMode(mode)
+      if (mode === 'manual-starts') {
+        reset()
+      }
+    },
+    [reset],
+  )
+  const handleManualStartTimeChange = useCallback((value: string) => {
+    setManualStartTime(normalizeManualStartTime(value))
+  }, [])
 
   const stageButtons = (
     <>
@@ -577,7 +613,7 @@ function App() {
   const isGroupSelectionLocked = runState !== 'idle'
   const callerScriptHeading: ReactNode = selectedGroup ? (
     <span className="inline-flex items-center gap-2">
-      <span>Caller Script</span>
+      <span>{displayMode === 'caller-script' ? 'Caller Script' : 'Manual Start Schedule'}</span>
       <span className="text-zinc-500">-</span>
       <div ref={callerGroupMenuRef} className="relative inline-block text-left">
         <button
@@ -641,7 +677,7 @@ function App() {
       </div>
     </span>
   ) : (
-    'Caller Script'
+    displayMode === 'caller-script' ? 'Caller Script' : 'Manual Start Schedule'
   )
 
   return (
@@ -658,17 +694,21 @@ function App() {
           </div>
           <div className="flex shrink-0 self-end sm:self-start">
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowScriptStack((prev) => !prev)}
-                className={`inline-flex cursor-pointer select-none items-center rounded-lg border px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
-                  showScriptStack
-                    ? 'border-emerald-400/70 bg-emerald-900/40 text-emerald-200 hover:border-emerald-300 hover:bg-emerald-900/50'
-                    : 'border-zinc-600 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800'
-                }`}
-              >
-                Script {showScriptStack ? 'On' : 'Off'}
-              </button>
+              <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">
+                  Display mode
+                </span>
+                <select
+                  value={displayMode}
+                  onChange={(e) =>
+                    handleChangeDisplayMode(e.target.value as DisplayMode)
+                  }
+                  className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                >
+                  <option value="caller-script">Caller Script</option>
+                  <option value="manual-starts">Manual Starts</option>
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={() => setMetronomeModalOpen(true)}
@@ -697,24 +737,31 @@ function App() {
           <StageClock
             members={groupMembersForScript}
             targetArrivalGapSeconds={selectedGroup?.targetArrivalGapSeconds ?? 0}
+            displayMode={displayMode}
+            manualStartTime={manualStartTime}
+            onManualStartTimeChange={handleManualStartTimeChange}
+            marchTimeOverrideSecondsByLeadId={
+              selectedGroup?.marchTimeOverrideSecondsByLeadId ?? {}
+            }
             elapsedMs={elapsedMs}
-            showScriptStack={showScriptStack}
             cueHeading={callerScriptHeading}
             stageActions={
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-                  Stage clock
-                </p>
-                <div
-                  className="mt-2 font-mono text-xl font-medium tabular-nums tracking-tight text-zinc-500 sm:text-2xl"
-                  aria-live="polite"
-                >
-                  {formatElapsed(elapsedMs)}
+              displayMode === 'caller-script' ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                    Stage clock
+                  </p>
+                  <div
+                    className="mt-2 font-mono text-xl font-medium tabular-nums tracking-tight text-zinc-500 sm:text-2xl"
+                    aria-live="polite"
+                  >
+                    {formatElapsed(elapsedMs)}
+                  </div>
+                  <div className="mt-8 flex flex-wrap justify-center gap-4">
+                    {stageButtons}
+                  </div>
                 </div>
-                <div className="mt-8 flex flex-wrap justify-center gap-4">
-                  {stageButtons}
-                </div>
-              </div>
+              ) : null
             }
           />
         </div>
