@@ -60,14 +60,14 @@ export function StageClock({
       <div
         className={`mt-4 grid w-full items-start gap-8 ${
           showScriptStack
-            ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
+            ? 'grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
             : 'grid-cols-1 justify-items-center'
         }`}
       >
         {members.length === 0 ? (
           <div
             className={`w-full rounded-xl border border-zinc-800/90 bg-zinc-950/70 p-8 text-center shadow-inner ${
-              showScriptStack ? 'col-span-2' : 'max-w-4xl'
+              showScriptStack ? 'md:col-span-2' : 'max-w-4xl'
             }`}
           >
             <p className="font-sans text-lg font-medium leading-normal tracking-normal text-zinc-400 sm:text-xl">
@@ -95,7 +95,7 @@ export function StageClock({
             {showScriptStack ? (
               <div className="min-w-0">
                 <div
-                  className="mt-4 w-full rounded-xl border border-zinc-800/90 bg-zinc-950/70 p-2 shadow-inner"
+                  className="mt-2 w-full rounded-xl border border-zinc-800/90 bg-zinc-950/70 p-2 shadow-inner md:mt-4"
                   aria-label="Remaining caller script"
                 >
                   {stackLines.length === 0 ? (
