@@ -693,8 +693,8 @@ function App() {
             </h1>
           </div>
           <div className="flex shrink-0 self-end sm:self-start">
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-2 rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <label className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300 sm:w-auto sm:justify-start">
                 <span className="text-xs uppercase tracking-wide text-zinc-500">
                   Mode
                 </span>
@@ -703,7 +703,7 @@ function App() {
                   onChange={(e) =>
                     handleChangeDisplayMode(e.target.value as DisplayMode)
                   }
-                  className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                  className="w-full min-w-0 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 focus:border-amber-500/80 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
                 >
                   <option value="caller-script">Caller Script</option>
                   <option value="manual-starts">Manual Starts</option>
